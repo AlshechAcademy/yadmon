@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YADMON</title>
+  <link rel="stylesheet" href="./css/app.css" />
+  <!-- Google Identity Services (token client for Calendar API) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Top HUD -->
+    <header id="hud">
+      <div class="hud-left">
+        <span id="logo">YADMON</span>
+        <span id="phase-tag">Phase 1</span>
+      </div>
+      <div class="hud-right">
+        <span id="clock" title="America/New_York">--:--</span>
+        <span id="status-dot" class="dot" title="status"></span>
+        <span id="status-text">booting…</span>
+      </div>
+    </header>
+
+    <!-- Timeline strip -->
+    <section id="timeline-wrap">
+      <div id="timeline-head">
+        <span id="timeline-title">Today</span>
+        <span id="countdown"></span>
+      </div>
+      <div id="timeline">
+        <div id="timeline-track"></div>
+        <div id="now-cursor" hidden></div>
+      </div>
+      <div id="timeline-legend"></div>
+    </section>
+
+    <!-- Scene / main area -->
+    <main id="scene">
+      <div id="signin-panel" class="panel">
+        <h1>Good morning.</h1>
+        <p id="signin-copy">Sign in with your Google account to wake YADMON.</p>
+        <button id="signin-btn" class="btn">Sign in with Google</button>
+        <button id="calendar-btn" class="btn" hidden>Connect Google Calendar</button>
+        <p id="signin-error" class="error" hidden></p>
+      </div>
+
+      <div id="day-panel" class="panel" hidden>
+        <p id="lineup"></p>
+        <ul id="event-list"></ul>
+        <div class="row">
+          <button id="signout-btn" class="btn btn-ghost">Sign out</button>
+          <span id="last-poll"></span>
+        </div>
+      </div>
+    </main>
+
+    <footer id="foot">
+      <span>read-only calendar · $0 stack · single user</span>
+    </footer>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+/* YADMON — app.css (Phase 1)
+   Retro Game Boy Color-ish palette, crisp pixel feel. Kept intentionally
+   lightweight; the full scene/sprite styling arrives in Phase 4. */
+
+:root {
+  --bg: #0f1420;
+  --panel: #172033;
+  --panel-2: #1e2a44;
+  --ink: #e8f0ff;
+  --ink-dim: #90a0c0;
+  --line: #2c3a58;
+  --accent: #7bd88f;
+  --warn: #f6c453;
+  --bad: #ff6b6b;
+
+  /* care-type colors (match the 10 blocks) */
+  --care-water: #4fa8ff;
+  --care-fruit: #ff9f43;
+  --care-love: #ff6bd6;
+  --care-walk: #5bd88f;
+  --care-play: #a97bff;
+  --care-bath: #45d6d6;
+  --care-groom: #63c7a6;
+  --care-exercise: #ff6b6b;
+  --care-treats: #f6c453;
+  --care-rest: #6f7bff;
+  --noncore: #55628a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  -webkit-font-smoothing: none;
+  image-rendering: pixelated;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 2px solid var(--line);
+}
+.hud-left { display: flex; align-items: baseline; gap: 10px; }
+#logo { font-weight: 700; letter-spacing: 2px; color: var(--accent); }
+#phase-tag {
+  font-size: 11px; color: var(--ink-dim);
+  border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px;
+}
+.hud-right { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+#clock { color: var(--ink); font-variant-numeric: tabular-nums; }
+.dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--ink-dim); display: inline-block;
+}
+.dot.ok { background: var(--accent); }
+.dot.warn { background: var(--warn); }
+.dot.bad { background: var(--bad); }
+#status-text { color: var(--ink-dim); }
+
+/* ---------- Timeline ---------- */
+#timeline-wrap { padding: 12px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+#timeline-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: var(--ink-dim); margin-bottom: 6px;
+}
+#countdown { color: var(--warn); font-variant-numeric: tabular-nums; }
+#timeline {
+  position: relative;
+  height: 56px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+#timeline-track { position: absolute; inset: 0; }
+
+/* hour gridlines drawn as children */
+.gridline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.gridlabel { position: absolute; bottom: 2px; font-size: 9px; color: var(--ink-dim); transform: translateX(2px); }
+
+/* event bars */
+.evt {
+  position: absolute; top: 8px; height: 30px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.35);
+  overflow: hidden;
+  display: flex; align-items: center;
+  padding: 0 4px;
+  font-size: 10px; color: #0b1020;
+  white-space: nowrap; text-overflow: ellipsis;
+}
+.evt.core { color: #0b1020; font-weight: 700; }
+.evt.noncore { background: var(--noncore); color: var(--ink); border-style: dashed; }
+
+#now-cursor {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  background: var(--bad); box-shadow: 0 0 6px var(--bad);
+  z-index: 5;
+}
+
+#timeline-legend {
+  display: flex; flex-wrap: wrap; gap: 8px 14px;
+  margin-top: 8px; font-size: 10px; color: var(--ink-dim);
+}
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* ---------- Scene / panels ---------- */
+#scene { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.panel {
+  width: 100%; max-width: 560px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+}
+.panel h1 { margin: 0 0 8px; font-size: 22px; }
+.panel p { color: var(--ink-dim); font-size: 13px; }
+
+.btn {
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  color: #0b1020; background: var(--accent);
+  border: none; border-radius: 6px;
+  padding: 10px 18px; margin: 10px 6px 0; cursor: pointer;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn-ghost { background: transparent; color: var(--ink-dim); border: 1px solid var(--line); }
+.error { color: var(--bad); }
+
+#day-panel { text-align: left; }
+#lineup { color: var(--ink); font-size: 14px; }
+#event-list { list-style: none; padding: 0; margin: 12px 0; }
+#event-list li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 12px;
+}
+#event-list li .tag {
+  font-size: 10px; padding: 1px 6px; border-radius: 4px; color: #0b1020; font-weight: 700;
+}
+#event-list li .tag.noncore { background: var(--noncore); color: var(--ink); }
+#event-list .time { color: var(--ink-dim); font-variant-numeric: tabular-nums; min-width: 96px; }
+.row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+#last-poll { font-size: 11px; color: var(--ink-dim); }
+
+#foot { padding: 8px 16px; font-size: 10px; color: var(--ink-dim); text-align: center; border-top: 1px solid var(--line); }
