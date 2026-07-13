@@ -2,7 +2,7 @@
 
 _Single source of truth for "what's done / what's next / open issues." Every session updates this._
 
-Last updated: 2026-07-13 (Phase 5 — generative audio; owner listen pending)
+Last updated: 2026-07-13 (Phase 6 — Gemini brain; owner accept test pending)
 
 ---
 
@@ -15,9 +15,9 @@ Last updated: 2026-07-13 (Phase 5 — generative audio; owner listen pending)
 - [x] **Phase 2 — Engine + data (+ time machine)** ✅ ACCEPTED (owner verified 2026-07-13: compressed day ran, Firestore row written)
 - [~] **Phase 3 — Rules engine** 🟡 BUILT — owner accept test pending
 - [x] **Phase 4 — Sprites** ✅ (5 species, renderer, 10 trait systems, scene integration; owner chose Aquafin)
-- [~] **Phase 5 — Audio** 🟡 BUILT — owner listen/veto/recompose pending
-- [ ] **Phase 6 — Brain (Gemini)** ← next after audio approved
-- [ ] Phase 7 — Shakedown
+- [x] **Phase 5 — Audio** ✅ (GB synth + generative themes + jingles; owner approved)
+- [~] **Phase 6 — Brain (Gemini)** 🟡 BUILT — owner accept test pending
+- [ ] **Phase 7 — Shakedown** ← final (a real week)
 
 ---
 
@@ -151,3 +151,19 @@ Open **/audio-lab.html**, click through every theme + jingle. For each: keep / v
 ## Phase 5 — generative themes (owner request)
 
 New `js/compose.js`. Themes are no longer static loops — each has an authored FOUNDATION (scale, chord progression, bass + drum templates, tempo/key ranges) with a PROCEDURALLY generated melody + arpeggio. Phrases (4 bars) regenerate continuously via a seeded RNG, so the tune never repeats. A **daySeed** (from the date) fixes each day's key + tempo; WORK also folds the block number in so each block has its own character. `audio.js` now calls `generatePhrase(name, daySeed, phraseIdx)` and regenerates at each phrase boundary. Deterministic (same seed → same phrase) but effectively endless within a day. Verified in-browser: plays clean, phrases evolve, no errors.
+
+## Phase 6 — what got built (Gemini brain, §8)
+
+New `js/brain.js`. Extended `js/ui.js` (speech bubble + silent emote + brain dot), `index.html`/`css` (bubble, 🔑 key button, brain dot), `js/main.js` (brainHook + key entry), `js/engine.js` (context builder + 10 moment triggers), `js/audio-data.js` (cutesy `talk` blip).
+
+- **One utterance = one Gemini call, zero canned lines (ruling #9).** `brain.say(moment, ctxPacket)` sends the verbatim `toneDirective` as systemInstruction + appended hard rules (first person, never invent numbers, <25 words, plain text), plus a JSON context packet of ONLY real DB numbers.
+- **Model:** `getModel()` from localStorage or `config.geminiModel`. **Key:** pasted via the 🔑 button → localStorage only, never committed/uploaded (§2).
+- **Rate limiter:** token bucket 8/min + daily cap 120; ambient chatter shed first under pressure. `budgetLeft()` exposed.
+- **Failure mode:** no key / API error → companion emotes silently "…!" (never a canned line); brain dot goes warn/bad. Verified: no-key returns `{skip, nokey}` gracefully, app loads with zero errors.
+- **Aquafin is TEXT-ONLY** (speech bubble), no spoken voice — a cutesy `talk` blip plays when a bubble pops.
+- **Moments wired (engine → ctx.brain.speak):** wake/day-scan, ambient (20-min spacing), call-tag, block-start (with metric stats), block-done (tier + value reaction), free-nudge (self-care seeds, 15-min spacing), neglect, death, evolution, recap (funnel). Context includes per-metric yesterday/3-day/7-day/month-best, neglect states, funnel — all real numbers.
+
+### Owner accept test (§12 Phase 6)
+1. Click **🔑** (footer) → paste your Gemini API key (from Phase 0). Stored only in this browser.
+2. Open **⏳ Time Machine** → run a compressed day → watch Aquafin talk with **live, unique dialogue** at each moment (wake, block start/done, celebrations, nudges, recap), each with the talk blip.
+3. **Pull the network** (or use a bad key) → the companion emotes silently "…!" — never a canned line. Brain dot turns warn/bad.
