@@ -14,7 +14,7 @@
     <header id="hud">
       <div class="hud-left">
         <span id="logo">YADMON</span>
-        <span id="phase-tag">Phase 1</span>
+        <span id="phase-tag">Phase 2</span>
       </div>
       <div class="hud-right">
         <span id="clock" title="America/New_York">--:--</span>
@@ -47,17 +47,47 @@
       </div>
 
       <div id="day-panel" class="panel" hidden>
+        <div id="state-banner"><span id="state-mode">—</span><span id="state-reason"></span></div>
         <p id="lineup"></p>
         <ul id="event-list"></ul>
         <div class="row">
-          <button id="signout-btn" class="btn btn-ghost">Sign out</button>
+          <div>
+            <button id="signout-btn" class="btn btn-ghost">Sign out</button>
+            <button id="connect-live-btn" class="btn">Connect Google Calendar</button>
+          </div>
           <span id="last-poll"></span>
         </div>
       </div>
     </main>
 
+    <!-- Care dock (bottom-right) -->
+    <div id="care-dock" hidden>
+      <button id="care-undo" title="undo">↶</button>
+      <button id="care-btn"><span id="care-icon">💧</span><span id="care-label">water</span></button>
+      <div id="care-tally">0</div>
+    </div>
+
+    <!-- Modal (confirmations / yes-no / number pad) -->
+    <div id="modal" hidden>
+      <div class="modal-card">
+        <p id="modal-q"></p>
+        <div id="modal-chips"></div>
+        <div id="modal-pad" hidden>
+          <div id="pad-display">0</div>
+          <div id="pad-keys"></div>
+          <div class="pad-actions">
+            <button id="pad-cancel" class="btn btn-ghost">Cancel</button>
+            <button id="pad-ok" class="btn">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toasts"></div>
+
     <footer id="foot">
       <span>read-only calendar · $0 stack · single user</span>
+      <button id="debug-toggle" title="time machine">⏳</button>
     </footer>
   </div>
 

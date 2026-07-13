@@ -1,6 +1,6 @@
-// YADMON — main.js (Phase 1)
-// Boot + wiring: Firebase Google sign-in (owner-gated), GIS calendar token,
-// 60s poll loop, timeline strip. (PLAN.md §2, §3, §4)
+// YADMON — main.js (Phase 2)
+// Boot + wiring: Firebase sign-in (owner-gated), Firestore store, GIS calendar,
+// the state-machine engine, and the time machine. (PLAN.md §2, §3, §4, §12)
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
@@ -10,6 +10,10 @@ import {
 import { config, firebaseConfig } from "./config.js";
 import { initTokenClient, requestToken, hasValidToken, fetchTodayEvents } from "./calendar.js";
 import * as ui from "./ui.js";
+import * as store from "./store.js";
+import * as engine from "./engine.js";
+import * as clock from "./clock.js";
+import * as debug from "./debug.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -17,38 +21,44 @@ const provider = new GoogleAuthProvider();
 provider.addScope("email");
 
 let currentUser = null;
-let pollTimer = null;
-let tickTimer = null;
-let events = [];
+let engineRunning = false;
+let liveEvents = [];
+let livePollTimer = null;
+let uiTimer = null;
+
+// Events the engine + timeline should use right now: sim override or live.
+function currentEvents() {
+  return debug.overrideEvents() ?? liveEvents;
+}
 
 // --- boot -------------------------------------------------------------------
-
 async function boot() {
+  store.initStore(app);
   ui.setStatus("booting…");
-  ui.setClock();
-  tickTimer = setInterval(onTick, 1000);
+  ui.setClock(clock.now());
+  ui.setCareHandlers({ onTap: engine.addTally, onUndo: engine.undoTally });
+  debug.init({ onChange: renderNow });
 
-  try {
-    await initTokenClient();
-  } catch (e) {
-    ui.setStatus("calendar SDK blocked", "bad");
-  }
+  uiTimer = setInterval(uiTick, 1000);
+
+  try { await initTokenClient(); }
+  catch { ui.setStatus("calendar SDK blocked", "bad"); }
 
   onAuthStateChanged(auth, (user) => {
     if (user && user.email === config.ownerEmail) {
       currentUser = user;
       ui.clearError();
       ui.setStatus(`signed in · ${user.email}`, "ok");
-      ui.showNeedsCalendar(user.email);
-      // If a calendar token is already live (same session), jump straight in.
-      if (hasValidToken()) startCalendar();
+      ui.showDay();
+      startEngine();
+      if (hasValidToken()) startLivePoll();
     } else if (user) {
-      // signed in as the wrong account
-      ui.showError(`This app is locked to ${config.ownerEmail}. You signed in as ${user.email}.`);
+      ui.showError(`Locked to ${config.ownerEmail}. You signed in as ${user.email}.`);
       signOut(auth);
     } else {
       currentUser = null;
-      stopCalendar();
+      stopEngine();
+      stopLivePoll();
       ui.setStatus("signed out");
       ui.showSignedOut();
     }
@@ -60,72 +70,77 @@ async function boot() {
 function wireButtons() {
   document.getElementById("signin-btn").addEventListener("click", async () => {
     ui.clearError();
-    try {
-      ui.setStatus("opening Google…");
-      await signInWithPopup(auth, provider);
-    } catch (e) {
-      ui.showError("Sign-in failed: " + (e.code || e.message));
-      ui.setStatus("sign-in failed", "bad");
-    }
+    try { ui.setStatus("opening Google…"); await signInWithPopup(auth, provider); }
+    catch (e) { ui.showError("Sign-in failed: " + (e.code || e.message)); ui.setStatus("sign-in failed", "bad"); }
   });
 
-  document.getElementById("calendar-btn").addEventListener("click", async () => {
+  document.getElementById("connect-live-btn").addEventListener("click", async () => {
     ui.clearError();
-    try {
-      ui.setStatus("connecting calendar…");
-      await requestToken({ interactive: true });
-      startCalendar();
-    } catch (e) {
-      ui.showError("Calendar connect failed: " + e.message);
-      ui.setStatus("calendar failed", "bad");
-    }
+    try { ui.setStatus("connecting calendar…"); await requestToken({ interactive: true }); startLivePoll(); }
+    catch (e) { ui.showError("Calendar connect failed: " + e.message); ui.setStatus("calendar failed", "bad"); }
   });
 
-  document.getElementById("signout-btn").addEventListener("click", () => {
-    signOut(auth);
-  });
+  document.getElementById("signout-btn").addEventListener("click", () => signOut(auth));
 }
 
-// --- calendar loop ----------------------------------------------------------
+// --- engine -----------------------------------------------------------------
+function startEngine() {
+  if (engineRunning) return;
+  engine.start({
+    now: clock.now,
+    getEvents: currentEvents,
+    autoplay: debug.isAutoplay,
+    store,
+    ui,
+  });
+  engineRunning = true;
+}
+function stopEngine() { engine.stop(); engineRunning = false; }
 
-function startCalendar() {
-  ui.showDay();
+// --- live calendar polling --------------------------------------------------
+function startLivePoll() {
   poll();
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(poll, config.pollSeconds * 1000);
-  // Re-poll immediately when the tab becomes visible again (throttling guard, §15).
+  if (livePollTimer) clearInterval(livePollTimer);
+  livePollTimer = setInterval(poll, config.pollSeconds * 1000);
   document.addEventListener("visibilitychange", onVisible);
+  document.getElementById("connect-live-btn").hidden = true;
 }
-
-function stopCalendar() {
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer = null;
+function stopLivePoll() {
+  if (livePollTimer) clearInterval(livePollTimer);
+  livePollTimer = null;
   document.removeEventListener("visibilitychange", onVisible);
+  const b = document.getElementById("connect-live-btn");
+  if (b) b.hidden = false;
 }
-
-function onVisible() {
-  if (document.visibilityState === "visible") poll();
-}
+function onVisible() { if (document.visibilityState === "visible") poll(); }
 
 async function poll() {
+  if (debug.overrideEvents()) return; // sim mode owns the events
   try {
     ui.setStatus("syncing calendar…", "ok");
-    events = await fetchTodayEvents();
-    ui.renderTimeline(events);
-    ui.updateNowCursor(events);
-    ui.renderDayPanel(events);
-    ui.setLastPoll();
-    ui.setStatus(`synced · ${events.length} event${events.length === 1 ? "" : "s"} today`, "ok");
+    liveEvents = await fetchTodayEvents();
+    ui.setLastPoll(clock.now());
+    ui.setStatus(`synced · ${liveEvents.length} event${liveEvents.length === 1 ? "" : "s"} today`, "ok");
+    renderNow();
   } catch (e) {
     ui.setStatus("sync error: " + e.message, "bad");
   }
 }
 
-// --- 1s UI tick -------------------------------------------------------------
+// --- render loop (timeline follows virtual/real time) -----------------------
+function renderNow() {
+  const events = currentEvents();
+  ui.renderTimeline(events);
+  ui.updateNowCursor(events, clock.now());
+  ui.renderDayPanel(events);
+}
 
-function onTick() {
-  ui.setClock();
-  if (currentUser && pollTimer) ui.updateNowCursor(events);
+function uiTick() {
+  ui.setClock(clock.now());
+  if (currentUser) {
+    ui.updateNowCursor(currentEvents(), clock.now());
+    if (clock.isSim()) renderNow();
+  }
 }
 
 boot();

@@ -157,4 +157,116 @@ html, body {
 .row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
 #last-poll { font-size: 11px; color: var(--ink-dim); }
 
-#foot { padding: 8px 16px; font-size: 10px; color: var(--ink-dim); text-align: center; border-top: 1px solid var(--line); }
+#foot {
+  padding: 8px 16px; font-size: 10px; color: var(--ink-dim);
+  text-align: center; border-top: 1px solid var(--line);
+  display: flex; justify-content: center; align-items: center; gap: 12px;
+}
+#debug-toggle {
+  background: transparent; border: 1px solid var(--line); color: var(--ink-dim);
+  border-radius: 4px; cursor: pointer; font-size: 12px; padding: 2px 6px;
+}
+
+/* ---------- state banner ---------- */
+#state-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 6px; margin-bottom: 12px;
+  background: var(--panel-2); border: 1px solid var(--line);
+}
+#state-mode { font-weight: 700; letter-spacing: 1px; }
+#state-reason { color: var(--ink-dim); font-size: 12px; }
+#state-banner.WORK { border-color: var(--accent); }
+#state-banner.WORK #state-mode { color: var(--accent); }
+#state-banner.FREE #state-mode { color: var(--warn); }
+#state-banner.SLEEP { opacity: 0.8; }
+#state-banner.SLEEP #state-mode { color: var(--ink-dim); }
+
+/* ---------- care dock ---------- */
+#care-dock {
+  position: fixed; right: 22px; bottom: 44px; z-index: 20;
+  display: flex; align-items: center; gap: 10px;
+}
+#care-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  width: 96px; height: 96px; border-radius: 16px; cursor: pointer;
+  border: 3px solid rgba(0,0,0,0.35); background: var(--care-water);
+  color: #0b1020; font-weight: 700; font-size: 13px; font-family: inherit;
+  box-shadow: 0 6px 0 rgba(0,0,0,0.35); transition: transform .05s;
+}
+#care-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,0.35); }
+#care-icon { font-size: 34px; line-height: 1; }
+#care-undo {
+  width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-size: 16px;
+}
+#care-tally {
+  min-width: 44px; height: 44px; padding: 0 8px; border-radius: 10px;
+  background: var(--panel); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+
+/* ---------- modal ---------- */
+#modal {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(4,8,16,0.72);
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-card {
+  width: 100%; max-width: 380px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 12px; padding: 22px; text-align: center;
+}
+#modal-q { font-size: 15px; color: var(--ink); margin: 0 0 16px; }
+#modal-chips { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.chip {
+  font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  padding: 10px 22px; border-radius: 8px; border: none; color: #0b1020;
+}
+.chip.yes { background: var(--accent); }
+.chip.no { background: var(--noncore); color: var(--ink); }
+.chip.neutral { background: var(--warn); }
+
+#modal-pad { margin-top: 16px; }
+#pad-display {
+  font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px; margin-bottom: 10px;
+}
+#pad-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+#pad-keys button {
+  font-family: inherit; font-size: 18px; padding: 12px; cursor: pointer;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; color: var(--ink);
+}
+.pad-actions { display: flex; gap: 10px; margin-top: 12px; }
+.pad-actions .btn { flex: 1; }
+
+/* ---------- toasts ---------- */
+#toasts {
+  position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%);
+  z-index: 30; display: flex; flex-direction: column; gap: 8px; align-items: center;
+}
+.toast {
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--ink);
+  padding: 8px 14px; border-radius: 8px; font-size: 12px;
+  animation: toastin .2s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+@keyframes toastin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ---------- debug / time machine ---------- */
+#debug {
+  position: fixed; right: 0; top: 0; bottom: 0; width: 320px; z-index: 50;
+  background: var(--panel); border-left: 2px solid var(--line);
+  padding: 16px; overflow-y: auto; font-size: 12px;
+}
+#debug h3 { margin: 0 0 4px; font-size: 13px; color: var(--accent); }
+#debug .grp { border-top: 1px solid var(--line); padding: 12px 0; }
+#debug label { display: block; color: var(--ink-dim); margin: 6px 0 2px; }
+#debug input, #debug select {
+  width: 100%; font-family: inherit; font-size: 12px; padding: 6px;
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px;
+}
+#debug .btn { width: 100%; margin: 8px 0 0; }
+#debug .mini { font-size: 11px; color: var(--ink-dim); }
+#debug .close { float: right; cursor: pointer; color: var(--ink-dim); background: none; border: none; font-size: 16px; }
+.row2 { display: flex; gap: 8px; }
+.row2 > * { flex: 1; }
