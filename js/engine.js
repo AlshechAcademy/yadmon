@@ -1,18 +1,19 @@
 // YADMON — engine.js
-// The daily state machine + scheduler. (PLAN.md §4)
-// Resolves SLEEP / WORK / FREE each tick by priority, drives block lifecycles
-// (begin → tally → confirm → write), early-cuts overlapped blocks, runs the call
-// funnel, and closes the day (unconfirmed → miss). Rules math (care/celebration/
-// neglect/death/evolution, §6) is Phase 3 — here `care` is a simple placeholder.
+// Daily state machine + scheduler (§4) with the §6 rules engine applied.
+// Resolves SLEEP/WORK/FREE, runs block lifecycles, the call funnel, day close,
+// neglect/death, monthly evolution, and the 2:25 recap.
 
 import { config } from "./config.js";
-import { zoneMinutes, hhmmToMinutes, dayBoundsRFC3339, isWorkday, minutesToLabel } from "./time.js";
+import {
+  zoneMinutes, hhmmToMinutes, dayBoundsRFC3339, isWorkday,
+} from "./time.js";
+import * as rules from "./rules.js";
 
 const WIN_START = hhmmToMinutes(config.windowStart);
 const WIN_END = hhmmToMinutes(config.windowEnd);
+const RECAP = hhmmToMinutes(config.recapTime);
 
 // --- pure state resolver (unit-tested) --------------------------------------
-// Given minutes-of-day and today's events, what state are we in right now?
 export function resolveState(nowMin, events) {
   const covering = events.filter((e) => nowMin >= e.startMin && nowMin < e.endMin);
   const nonCore = covering.find((e) => !e.core);
@@ -24,6 +25,20 @@ export function resolveState(nowMin, events) {
   return { mode: "FREE" };
 }
 
+// --- small helpers ----------------------------------------------------------
+const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+function ymd(d) { return dayBoundsRFC3339(d).ymd; }
+function prevMonthStr(d) {
+  let [y, m] = ymd(d).split("-").map(Number);
+  m -= 1; if (m < 1) { m = 12; y -= 1; }
+  return `${y}-${String(m).padStart(2, "0")}`;
+}
+function monthBefore(ym) {
+  let [y, m] = ym.split("-").map(Number);
+  m -= 1; if (m < 1) { m = 12; y -= 1; }
+  return `${y}-${String(m).padStart(2, "0")}`;
+}
+
 // --- stateful engine --------------------------------------------------------
 let ctx = null;
 let timer = null;
@@ -33,24 +48,27 @@ let closed = false;
 let busy = false;
 let curMode = null;
 
-let tallies = {};          // blockId -> count (today)
-let activeEvtId = null;    // event id of the core block in WORK
+let tallies = {};
+let activeEvtId = null;
 let finalizedEvt = new Set();
-let askedCall = new Set(); // non-core event ids already asked "sales call?"
-let callInfo = {};         // eventId -> {isCall, followedUp}
-let followupQueue = [];    // eventIds of ended tagged-calls awaiting follow-up
+let askedCall = new Set();
+let callInfo = {};
+let followupQueue = [];
+let recapShown = false;
 
-function ymd(d) { return dayBoundsRFC3339(d).ymd; }
+let historyRows = [];   // workday rows before today (baselines)
+let companion = null;   // live companion state
+
+function priorVals(metricId) { return historyRows.map((r) => r["m" + metricId] ?? 0); }
+function priorMonthVals(metricId, ym) {
+  return historyRows.filter((r) => r.date.startsWith(ym)).map((r) => r["m" + metricId] ?? 0);
+}
+function lastPrior(metricId) { const v = priorVals(metricId); return v.length ? v[v.length - 1] : 0; }
 
 function resetDay(date) {
-  today = date;
-  closed = false;
-  tallies = {};
-  activeEvtId = null;
-  finalizedEvt = new Set();
-  askedCall = new Set();
-  callInfo = {};
-  followupQueue = [];
+  today = date; closed = false; recapShown = false;
+  tallies = {}; activeEvtId = null;
+  finalizedEvt = new Set(); askedCall = new Set(); callInfo = {}; followupQueue = [];
   curMode = null;
 }
 
@@ -60,25 +78,23 @@ export function start(context) {
   timer = setInterval(() => { tick().catch((e) => console.error("engine tick", e)); }, 1000);
   tick().catch((e) => console.error("engine tick", e));
 }
+export function stop() { if (timer) clearInterval(timer); timer = null; }
 
-export function stop() {
-  if (timer) clearInterval(timer);
-  timer = null;
-}
-
-// care-button callbacks
-export function addTally(blockId) {
-  tallies[blockId] = (tallies[blockId] || 0) + 1;
-  ctx?.ui.updateTally(tallies[blockId]);
-}
-export function undoTally(blockId) {
-  tallies[blockId] = Math.max(0, (tallies[blockId] || 0) - 1);
-  ctx?.ui.updateTally(tallies[blockId]);
-}
+export function addTally(blockId) { tallies[blockId] = (tallies[blockId] || 0) + 1; ctx?.ui.updateTally(tallies[blockId]); }
+export function undoTally(blockId) { tallies[blockId] = Math.max(0, (tallies[blockId] || 0) - 1); ctx?.ui.updateTally(tallies[blockId]); }
 export function getTally(blockId) { return tallies[blockId] || 0; }
+export function getCompanion() { return companion; }
 export function snapshot() {
   return { today, closed, curMode, activeEvtId, tallies: { ...tallies },
-    finalized: [...finalizedEvt], calls: { ...callInfo } };
+    finalized: [...finalizedEvt], companion };
+}
+
+async function onNewDay(date, now) {
+  resetDay(date);
+  await ctx.store.ensureDayRow(date, !isWorkday(now));
+  historyRows = await ctx.store.historyBefore(date);
+  companion = await ctx.store.ensureCompanion();
+  if (isWorkday(now)) await maybeRunEvolution(now);
 }
 
 async function tick() {
@@ -89,76 +105,53 @@ async function tick() {
     const date = ymd(now);
     const nowMin = zoneMinutes(now);
 
-    if (date !== today) {
-      resetDay(date);
-      await ctx.store.ensureDayRow(date, !isWorkday(now));
-    }
+    if (date !== today) await onNewDay(date, now);
 
-    // rest day
-    if (!isWorkday(now)) {
-      setMode("SLEEP");
-      ctx.ui.showState("SLEEP", { reason: "rest day — see you next workday" });
-      return;
-    }
-    // before wake
-    if (nowMin < WIN_START) {
-      setMode("SLEEP");
-      ctx.ui.showState("SLEEP", { reason: `asleep — wakes at ${config.windowStart}` });
-      return;
-    }
-    // after close
+    if (!isWorkday(now)) { setMode("SLEEP"); ctx.ui.showState("SLEEP", { reason: "rest day — see you next workday" }); return; }
+    if (nowMin < WIN_START) { setMode("SLEEP"); ctx.ui.showState("SLEEP", { reason: `asleep — wakes at ${config.windowStart}` }); return; }
     if (nowMin >= WIN_END) {
       if (!closed) await runClose();
-      setMode("SLEEP");
-      ctx.ui.showState("SLEEP", { reason: "day closed — good night" });
-      return;
+      setMode("SLEEP"); ctx.ui.showState("SLEEP", { reason: "day closed — good night" }); return;
     }
+
+    // 2:25 recap
+    if (nowMin >= RECAP && !recapShown) { recapShown = true; await showRecap(); }
 
     const events = ctx.getEvents() || [];
 
-    // 1) call tagging — ask once per non-core timed event that has started
+    // 1) call tagging (one prompt per tick)
     for (const ev of events) {
       if (!ev.core && nowMin >= ev.startMin && !askedCall.has(ev.id)) {
         askedCall.add(ev.id);
         const isCall = ctx.autoplay() ? true : await ctx.ui.askYesNo(`New event "${ev.title}" — sales call?`);
         callInfo[ev.id] = { isCall, followedUp: false, ev };
         if (isCall) await ctx.store.logCall(today, ev);
-        break; // one prompt per tick
+        break;
       }
     }
-
     // 2) enqueue follow-ups for ended tagged calls
     for (const id of Object.keys(callInfo)) {
       const info = callInfo[id];
-      if (info.isCall && !info.followedUp && nowMin >= info.ev.endMin && !followupQueue.includes(id)) {
-        followupQueue.push(id);
-      }
+      if (info.isCall && !info.followedUp && nowMin >= info.ev.endMin && !followupQueue.includes(id)) followupQueue.push(id);
     }
     // 3) process one follow-up
     if (followupQueue.length) {
-      const id = followupQueue[0];
-      const info = callInfo[id];
+      const id = followupQueue[0]; const info = callInfo[id];
       const attended = ctx.autoplay() ? Math.random() < 0.7 : await ctx.ui.askYesNo(`Call "${info.ev.title}" — did they show?`);
       let signedUp = false;
-      if (attended) {
-        signedUp = ctx.autoplay() ? Math.random() < 0.4 : await ctx.ui.askYesNo(`"${info.ev.title}" — did they sign up?`);
-      }
+      if (attended) signedUp = ctx.autoplay() ? Math.random() < 0.4 : await ctx.ui.askYesNo(`"${info.ev.title}" — did they sign up?`);
       await ctx.store.updateCallFollowup(today, id, { attended, signedUp });
-      info.followedUp = true;
-      followupQueue.shift();
+      info.followedUp = true; followupQueue.shift();
     }
 
-    // 4) resolve current state
+    // 4) resolve
     const st = resolveState(nowMin, events);
-
     if (st.mode === "SLEEP") {
-      if (activeEvtId) await finalizeBlock(activeEvtId); // early-cut overlapped core
-      setMode("SLEEP");
-      ctx.ui.hideCareButton();
+      if (activeEvtId) await finalizeBlock(activeEvtId);
+      setMode("SLEEP"); ctx.ui.hideCareButton();
       ctx.ui.showState("SLEEP", { reason: `event: ${st.event.title}` });
       return;
     }
-
     if (st.mode === "WORK") {
       if (activeEvtId && activeEvtId !== st.event.id) await finalizeBlock(activeEvtId);
       if (activeEvtId !== st.event.id) {
@@ -166,30 +159,21 @@ async function tick() {
         if (tallies[st.block.id] == null) tallies[st.block.id] = 0;
         ctx.ui.showCareButton(st.block, tallies[st.block.id]);
       }
-      if (ctx.autoplay() && tallies[st.block.id] < 40) {
-        tallies[st.block.id] += 1;
-        ctx.ui.updateTally(tallies[st.block.id]);
-      }
-      setMode("WORK");
-      ctx.ui.showState("WORK", { block: st.block, event: st.event });
+      if (ctx.autoplay() && tallies[st.block.id] < 40) { tallies[st.block.id] += 1; ctx.ui.updateTally(tallies[st.block.id]); }
+      setMode("WORK"); ctx.ui.showState("WORK", { block: st.block, event: st.event });
       return;
     }
-
     // FREE
     if (activeEvtId) await finalizeBlock(activeEvtId);
-    setMode("FREE");
-    ctx.ui.hideCareButton();
-    ctx.ui.showState("FREE", {});
+    setMode("FREE"); ctx.ui.hideCareButton(); ctx.ui.showState("FREE", {});
   } finally {
     busy = false;
   }
 }
 
-function setMode(m) {
-  if (m !== curMode) curMode = m;
-}
+function setMode(m) { if (m !== curMode) curMode = m; }
 
-// Confirm a block's tally, write it, mark finalized. (§4 confirmation flow)
+// Confirm a block: real §6.1 care + §6.2 celebration tier, then write.
 async function finalizeBlock(evtId) {
   if (finalizedEvt.has(evtId)) { if (activeEvtId === evtId) activeEvtId = null; return; }
   const ev = (ctx.getEvents() || []).find((e) => e.id === evtId);
@@ -197,51 +181,117 @@ async function finalizeBlock(evtId) {
 
   const block = ev.block;
   const tally = tallies[block.id] || 0;
-
   let value = tally;
-  if (!ctx.autoplay()) {
-    value = await ctx.ui.confirmCount(block, tally, ev);
-  }
-  // Placeholder care rule (real §6 rule arrives in Phase 3): any confirmed ≥1.
-  const care = value >= 1;
-  await ctx.store.writeMetric(today, block.id, value, care, false);
+  if (!ctx.autoplay()) value = await ctx.ui.confirmCount(block, tally, ev);
 
+  const B = lastPrior(block.id);
+  const care = rules.careReceived(value, true, B);
+  const tier = rules.celebrationTier(value, priorVals(block.id), priorMonthVals(block.id, today.slice(0, 7)));
+
+  await ctx.store.writeMetric(today, block.id, value, care, false);
   finalizedEvt.add(evtId);
   if (activeEvtId === evtId) activeEvtId = null;
   ctx.ui.hideCareButton();
+  ctx.ui.showCelebration?.(tier, block, value);
   ctx.ui.toast(`Logged ${value} — ${block.metric}`);
 }
 
-// Day close: finalize active block, write misses for unconfirmed core blocks,
-// no-show any un-answered calls. (§3, §4)
+// Day close: finalize active, write misses for EVERY unconfirmed metric
+// (absent block = 0, §4), no-show open calls, then §6.3 neglect + §6.4 death.
 async function runClose() {
-  const events = ctx.getEvents() || [];
   if (activeEvtId) await finalizeBlock(activeEvtId);
 
-  for (const ev of events) {
-    if (ev.core && !finalizedEvt.has(ev.id)) {
-      await ctx.store.writeMetric(today, ev.block.id, 0, false, true); // miss
-      finalizedEvt.add(ev.id);
-    }
+  let row = (await ctx.store.getDay(today)) || {};
+  for (let i = 1; i <= 10; i++) {
+    if (row["m" + i] == null) { await ctx.store.writeMetric(today, i, 0, false, true); }
   }
   for (const id of Object.keys(callInfo)) {
     const info = callInfo[id];
-    if (info.isCall && !info.followedUp) {
-      await ctx.store.updateCallFollowup(today, id, { attended: false, signedUp: false });
-      info.followedUp = true;
-    }
+    if (info.isCall && !info.followedUp) { await ctx.store.updateCallFollowup(today, id, { attended: false, signedUp: false }); info.followedUp = true; }
+  }
+
+  // reload the finalized row and run the rules
+  row = (await ctx.store.getDay(today)) || {};
+  if (!companion) companion = await ctx.store.ensureCompanion();
+  for (let i = 1; i <= 10; i++) {
+    const missed = row["missed" + i] === true;
+    const v = row["m" + i] ?? 0;
+    const confirmed = !missed && row["m" + i] != null;
+    const care = rules.careReceived(v, confirmed, lastPrior(i));
+    companion.neglect["m" + i] = rules.neglectStep(
+      companion.neglect["m" + i] || rules.freshNeglect(),
+      { careReceived: care, confirmed, v }
+    );
+  }
+
+  const death = rules.deathCheck(companion.neglect);
+  if (death.dead) {
+    const cause = Object.keys(companion.neglect).filter((k) => companion.neglect[k].state === "NEGLECTED");
+    await ctx.store.archiveCompanion(companion, cause);
+    const next = ctx.store.newCompanion((companion.speciesIdx + 1) % ctx.store.SPECIES_COUNT, Date.now());
+    next.lastEvolvedForMonth = companion.lastEvolvedForMonth; // baselines continue (ruling #5)
+    ctx.ui.showDeath?.(cause, companion);
+    companion = next;
+    await ctx.store.setCompanion(companion);
+  } else {
+    await ctx.store.setCompanion(companion);
   }
   closed = true;
   ctx.ui.toast("Day closed — numbers locked in.");
 }
 
-// --- test hooks (used by the headless self-test; harmless in the browser) ---
-export async function _testTick(context) {
-  if (context) ctx = context;
-  return tick();
+// §6.5 monthly evolution at first wake of a new month.
+async function maybeRunEvolution(now) {
+  const doneMonth = prevMonthStr(now);
+  if (!companion) companion = await ctx.store.ensureCompanion();
+  if (companion.lastEvolvedForMonth === doneMonth) return;
+
+  const doneRows = await ctx.store.monthRows(doneMonth);
+  if (!doneRows.length) return; // nothing to evolve from yet
+
+  const prevMonth = monthBefore(doneMonth);
+  const prevRows = await ctx.store.monthRows(prevMonth);
+  const before = await ctx.store.historyBefore(doneMonth + "-01");
+  const firstMonthEver = before.length === 0;
+
+  const perMetric = [];
+  for (let i = 1; i <= 10; i++) {
+    perMetric.push({ id: i, aM: mean(doneRows.map((r) => r["m" + i] ?? 0)), aMprev: mean(prevRows.map((r) => r["m" + i] ?? 0)) });
+  }
+  const { winnerId, framing } = rules.evolutionWinner(perMetric, { firstMonthEver });
+  if (winnerId) {
+    companion.traitLevels["t" + winnerId] = (companion.traitLevels["t" + winnerId] || 0) + 1;
+    const total = Object.values(companion.traitLevels).reduce((a, b) => a + b, 0);
+    const newStage = rules.maturityStageFor(total);
+    const stageBump = newStage > companion.maturityStage;
+    companion.maturityStage = newStage;
+    ctx.ui.showEvolution?.(winnerId, framing, stageBump, companion);
+  }
+  companion.lastEvolvedForMonth = doneMonth;
+  await ctx.store.setCompanion(companion);
 }
+
+// 2:25 recap scorecard + funnel.
+async function showRecap() {
+  const row = (await ctx.store.getDay(today)) || {};
+  const trailing = (await ctx.store.historyBefore(today)).slice(-7);
+  const funnel = {
+    memos: (row.m1 || 0) + (row.m2 || 0) + (row.m4 || 0),
+    calls: row.m11_calls || 0, attended: row.m12_attended || 0, signups: row.m13_signups || 0,
+    trailing7: trailing.reduce((a, r) => ({
+      memos: a.memos + (r.m1 || 0) + (r.m2 || 0) + (r.m4 || 0),
+      calls: a.calls + (r.m11_calls || 0), attended: a.attended + (r.m12_attended || 0), signups: a.signups + (r.m13_signups || 0),
+    }), { memos: 0, calls: 0, attended: 0, signups: 0 }),
+  };
+  const neglectWarn = companion ? Object.keys(companion.neglect).filter((k) => companion.neglect[k].state === "NEGLECTED") : [];
+  ctx.ui.showRecap?.({ row, funnel, neglect: neglectWarn, companion });
+}
+
+// --- test hooks -------------------------------------------------------------
+export async function _testTick(context) { if (context) ctx = context; return tick(); }
 export function _testReset() {
   today = null; closed = false; busy = false; activeEvtId = null;
   finalizedEvt = new Set(); askedCall = new Set(); callInfo = {};
-  followupQueue = []; tallies = {}; curMode = null;
+  followupQueue = []; tallies = {}; curMode = null; recapShown = false;
+  historyRows = []; companion = null;
 }

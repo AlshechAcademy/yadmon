@@ -2,7 +2,7 @@
 
 _Single source of truth for "what's done / what's next / open issues." Every session updates this._
 
-Last updated: 2026-07-13 (Phase 2 ACCEPTED)
+Last updated: 2026-07-13 (Phase 3 built — awaiting owner accept test)
 
 ---
 
@@ -13,8 +13,8 @@ Last updated: 2026-07-13 (Phase 2 ACCEPTED)
 - [x] **Phase 0 — Accounts & keys** ✅ DONE
 - [x] **Phase 1 — Skeleton + calendar** ✅ ACCEPTED (owner verified 2026-07-13: all 10 blocks color-matched, non-core flagged, live drag-sync confirmed)
 - [x] **Phase 2 — Engine + data (+ time machine)** ✅ ACCEPTED (owner verified 2026-07-13: compressed day ran, Firestore row written)
-- [ ] **Phase 3 — Rules engine** ← NEXT
-- [ ] Phase 4 — Sprites
+- [~] **Phase 3 — Rules engine** 🟡 BUILT — owner accept test pending
+- [ ] **Phase 4 — Sprites** ← next after accept
 - [ ] Phase 5 — Audio
 - [ ] Phase 6 — Brain (Gemini)
 - [ ] Phase 7 — Shakedown
@@ -88,3 +88,26 @@ New files: `js/clock.js` (virtual clock), `js/store.js` (Firestore §7 data laye
 
 ## Phase 3 needs (next)
 Per PLAN.md §6: care test, celebration tiers, neglect state machine, death, monthly evolution, bootstrapping — plus the 2:25 recap. Ship with the 8-scenario time-machine suite (§12 Phase 3). Replace the Phase-2 `care=value>=1` placeholder with the real §6.1 rule.
+
+## Phase 3 — what got built
+
+New file `js/rules.js` (pure §6 math). Extended `js/store.js` (history + companion state), `js/engine.js` (rules applied at confirm/close/wake/recap), `js/ui.js` (celebration + recap + ceremony UI).
+
+- **Care test (§6.1):** `careReceived = confirmed AND v≥1 AND (B<1 OR 2v≥B)`. Replaces the Phase-2 placeholder. Written to `care{i}` at confirm.
+- **Celebration tiers (§6.2):** FIRST → MONTH_BEST → BEATS_7 → BEATS_3 → BEATS_YEST → DISAPPOINTMENT, evaluated against history strictly before today. Shown as tier badges/toasts (no companion dialogue — that's Phase 6).
+- **Neglect machine (§6.3):** per-metric OK/NEGLECTED with the counter + two-day clear protocol. Runs at day close. Absent core blocks count as 0/miss (§4).
+- **Death (§6.4):** 3+ metrics NEGLECTED at close → archive to `companions/{id}`, spawn next species at base form (neglect cleared, traits 0), business data untouched (ruling #5).
+- **Monthly evolution (§6.5):** first wake of a new month evaluates the just-ended month vs the prior; winner trait +1; every 6 cumulative levels → maturity stage +1; all-decline → "held the line".
+- **2:25 recap (§4):** scorecard of all 10 metrics + funnel (today + trailing 7 workdays) + neglect warnings.
+- **Firestore (§7):** `state/companion` now carries `traitLevels`, `maturityStage`, `neglect{}`, `lastEvolvedForMonth`; `companions/{id}` archives on death.
+
+### Self-test (headless, passed)
+- **33/33** rules unit tests: care test, all 6 celebration tiers + priority, neglect accrual (3 misses), successful 2-day clear, failed clear (<50% day two), miss resets, death at 3, evolution scoring (finite / new-from-zero / all-decline / first-month / tie-breaks), maturity stages.
+- **17/17** engine integration: first day + cut-short + FIRST celebrations; 3-miss neglect → death → new species + archive; month-rollover evolution + trait bump; MONTH_BEST tier priority.
+- Covers all 8 PLAN.md §12 Phase-3 scenarios.
+
+### Owner accept test (browser — use the ⏳ Time Machine)
+1. **First day:** wipe today's row, Run a compressed day → confirm celebrations fire and Firestore `care{i}` flags look right.
+2. **Neglect → death:** set a virtual date, turn sim ON + autoplay OFF is slow; easiest is: use Inject History with low numbers, then run several compressed empty days (sim off, no events) so metrics miss 3× → watch a death ceremony + a new companion; verify `companions/{id}` archive + reset `state/companion` in Firestore.
+3. **Evolution:** Inject history for a prior month, set virtual date to the 1st of the next month, run wake → watch the evolution toast; verify `traitLevels` bumped in `state/companion`.
+4. **Recap:** let a compressed day reach 2:25 → the recap card appears.

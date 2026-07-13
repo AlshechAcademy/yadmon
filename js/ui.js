@@ -331,3 +331,67 @@ export function toast(msg, ms = 3200) {
   $("toasts").appendChild(t);
   setTimeout(() => t.remove(), ms);
 }
+
+// ===========================================================================
+// Phase 3 — celebrations, recap, evolution + death ceremonies (§6)
+// Note: no companion *dialogue* here (that is live Gemini in Phase 6). These
+// are app-chrome ceremonies: tier badges, scorecards, ceremony cards.
+// ===========================================================================
+
+const TIER_UI = {
+  FIRST: ["🌟", "first ever!"],
+  MONTH_BEST: ["🏆", "month best!"],
+  BEATS_7: ["🔥", "beats your 7-day avg"],
+  BEATS_3: ["✨", "beats your 3-day avg"],
+  BEATS_YEST: ["👍", "beats yesterday"],
+  DISAPPOINTMENT: ["🥺", "wants more next time"],
+};
+
+export function showCelebration(tier, block, value) {
+  const [ic, txt] = TIER_UI[tier] || ["", ""];
+  toast(`${ic} ${block.metric}: ${value} — ${txt}`);
+}
+
+export function showEvolution(winnerId, framing, stageBump) {
+  toast(`🧬 EVOLUTION — trait #${winnerId} leveled up · ${framing}`, 6000);
+  if (stageBump) toast("⬆️ your companion matured to a new stage!", 6000);
+}
+
+// A simple ceremony card reusing the modal overlay, dismissed with OK.
+function showCard(title, html) {
+  $("modal-q").innerHTML = `<strong>${title}</strong><br><br>${html}`;
+  $("modal-pad").hidden = true;
+  const chips = $("modal-chips");
+  chips.innerHTML = "";
+  const okb = document.createElement("button");
+  okb.className = "chip yes";
+  okb.textContent = "OK";
+  okb.onclick = () => { $("modal").hidden = true; $("modal-q").textContent = ""; };
+  chips.append(okb);
+  $("modal").hidden = false;
+}
+
+export function showDeath(cause, dead) {
+  const metrics = (cause || []).map((c) => "#" + String(c).replace("m", "")).join(", ");
+  showCard("💀 A companion has passed",
+    `Neglected too long: ${metrics}.<br>A new companion is born at base form. Its predecessor now roams the background.`);
+}
+
+export function showRecap(data) {
+  const r = data.row || {};
+  const f = data.funnel || {};
+  let grid = "";
+  for (let i = 1; i <= 10; i++) {
+    const v = r["m" + i];
+    grid += `#${i}: <b>${v == null ? "—" : v}</b>${r["missed" + i] ? " (miss)" : ""}&nbsp;&nbsp;`;
+    if (i % 2 === 0) grid += "<br>";
+  }
+  const t7 = f.trailing7 || {};
+  const funnel =
+    `today: memos ${f.memos} → calls ${f.calls} → attended ${f.attended} → signups ${f.signups}` +
+    `<br>7-day: memos ${t7.memos || 0} → calls ${t7.calls || 0} → attended ${t7.attended || 0} → signups ${t7.signups || 0}`;
+  const neg = data.neglect && data.neglect.length
+    ? `<br><br>⚠️ neglected: ${data.neglect.map((c) => "#" + String(c).replace("m", "")).join(", ")}`
+    : "";
+  showCard("📋 Daily recap", `${grid}<br><b>Funnel:</b><br>${funnel}${neg}<br><br>Good night.`);
+}

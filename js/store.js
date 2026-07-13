@@ -159,3 +159,63 @@ export async function exportCSV() {
   );
   return [header, ...lines].join("\n");
 }
+
+// ===========================================================================
+// Phase 3 — history reads + companion state (§6, §7)
+// ===========================================================================
+
+export const SPECIES_COUNT = 5;
+
+// All workday (non-rest) rows strictly before `date`, oldest -> newest.
+export async function historyBefore(date) {
+  const rows = await allDays();
+  return rows.filter((r) => !r.rest && typeof r.date === "string" && r.date < date);
+}
+
+// All workday rows within calendar month `ym` ("YYYY-MM").
+export async function monthRows(ym) {
+  const rows = await allDays();
+  return rows.filter((r) => !r.rest && typeof r.date === "string" && r.date.startsWith(ym));
+}
+
+// Base companion factory: all traits 0, maturity 0, neglect cleared. (ruling #5)
+export function newCompanion(speciesIdx, bornMs) {
+  const traitLevels = {};
+  const neglect = {};
+  for (let i = 1; i <= 10; i++) {
+    traitLevels["t" + i] = 0;
+    neglect["m" + i] = { state: "OK", c: 0, clearStep: 0, vClear: null };
+  }
+  return {
+    id: "c" + bornMs,
+    name: "Yad",
+    speciesIdx,
+    bornDate: new Date(bornMs).toISOString().slice(0, 10),
+    traitLevels,
+    maturityStage: 0,
+    neglect,
+    lastEvolvedForMonth: null,
+  };
+}
+
+// Get the live companion, creating a base one on first run.
+export async function ensureCompanion() {
+  const c = await getCompanion();
+  if (c && c.traitLevels && c.neglect) return c;
+  const fresh = newCompanion(0, Date.now());
+  await setCompanion(fresh);
+  return fresh;
+}
+
+// Archive a dead companion to companions/{id}. (§7)
+export async function archiveCompanion(c, causeMetrics) {
+  await setDoc(doc(db, "companions", c.id), {
+    speciesIdx: c.speciesIdx,
+    name: c.name,
+    born: c.bornDate,
+    died: new Date().toISOString().slice(0, 10),
+    traitSnapshot: c.traitLevels,
+    maturityStage: c.maturityStage,
+    causeMetrics,
+  });
+}
