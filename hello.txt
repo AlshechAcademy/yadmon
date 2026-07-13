@@ -1,0 +1,2 @@
+Hello from Claude Cowork — file access confirmed.
+Written during Phase −1 verification for the YADMON project on 2026-07-13.

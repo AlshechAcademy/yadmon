@@ -1,0 +1,4 @@
+# Ignore local secrets and OS cruft
+.DS_Store
+Thumbs.db
+*.log
