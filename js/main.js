@@ -16,7 +16,7 @@ import * as clock from "./clock.js";
 import * as debug from "./debug.js";
 import { drawCompanion } from "./sprites.js";
 import * as audio from "./audio.js";
-import { zoneMinutes, hhmmToMinutes } from "./time.js";
+import { zoneMinutes, hhmmToMinutes, dayBoundsRFC3339 } from "./time.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -161,11 +161,14 @@ function renderNow() {
 function updateTheme() {
   if (!currentUser) { audio.stopTheme(); return; }
   const mode = engine.getMode();
-  const nowMin = zoneMinutes(clock.now());
+  const now = clock.now();
+  const nowMin = zoneMinutes(now);
   if (mode === "SLEEP" || nowMin < WIN_S || nowMin >= WIN_E) { audio.stopTheme(); return; }
-  if (nowMin < CORE_START) audio.playTheme("wake");
-  else if (mode === "WORK") audio.playTheme("focus", { seed: Math.floor(nowMin / 30) });
-  else audio.playTheme("free");
+  const daySeed = Number(dayBoundsRFC3339(now).ymd.replace(/-/g, "")); // e.g. 20260713
+  if (nowMin < CORE_START) audio.playTheme("wake", { daySeed });
+  // each work block gets its own key/tempo character; melody still evolves within it
+  else if (mode === "WORK") audio.playTheme("focus", { daySeed: daySeed * 100 + Math.floor(nowMin / 30) });
+  else audio.playTheme("free", { daySeed });
 }
 
 function uiTick() {

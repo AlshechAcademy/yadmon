@@ -5,7 +5,8 @@
 // Audio unlocks on the first user gesture (browser autoplay policy). Original
 // compositions only — style, never songs (ruling #10).
 
-import { THEMES, SFX } from "./audio-data.js";
+import { SFX } from "./audio-data.js";
+import { generatePhrase, THEME_NAMES } from "./compose.js";
 
 let ctx = null;
 let master = null;
@@ -111,14 +112,16 @@ function scheduleStep(comp, step, t, transpose) {
 function runScheduler() {
   if (!current) return;
   const ahead = 0.12;
-  const comp = current.comp;
-  const stepDur = 60 / (comp.bpm * (comp._bpmScale || 1)) / 4;
   while (current.nextTime < ctx.currentTime + ahead) {
+    const comp = current.comp;
+    const stepDur = 60 / (comp.bpm * (comp._bpmScale || 1)) / 4;
     scheduleStep(comp, current.step, current.nextTime, current.transpose);
     current.nextTime += stepDur;
     current.step++;
-    if (current.step >= patLen(comp)) {
-      if (comp.loop === false) { current = null; return; }
+    if (current.step >= (comp.steps || patLen(comp))) {
+      // regenerate a fresh phrase → endless, non-repeating variation
+      current.phrase++;
+      current.comp = generatePhrase(current.name, current.daySeed, current.phrase);
       current.step = 0;
     }
   }
@@ -129,14 +132,12 @@ function runScheduler() {
 export function playTheme(name, opts = {}) {
   ensureCtx();
   if (ctx.state === "suspended") ctx.resume();
-  const base = THEMES[name];
-  if (!base) return;
-  if (current && current.name === name && current.seed === opts.seed) return; // already playing
-  const comp = { ...base, tracks: base.tracks };
-  const seed = opts.seed || 0;
-  comp._bpmScale = 1 + (((seed % 5) - 2) * 0.03);      // ±6% tempo
-  const transpose = (name === "focus") ? [0, 2, 4, 5, 7][seed % 5] : 0; // seeded key for focus
-  current = { name, comp, seed: opts.seed, step: 0, transpose, nextTime: ctx.currentTime + 0.06 };
+  if (!THEME_NAMES.includes(name)) return;
+  const daySeed = opts.daySeed || 1;
+  // keep evolving if the same theme+day is already playing
+  if (current && current.name === name && current.daySeed === daySeed) return;
+  const comp = generatePhrase(name, daySeed, 0);
+  current = { name, daySeed, phrase: 0, comp, step: 0, transpose: 0, nextTime: ctx.currentTime + 0.06 };
   if (!schedTimer) schedTimer = setInterval(runScheduler, 25);
   runScheduler();
 }

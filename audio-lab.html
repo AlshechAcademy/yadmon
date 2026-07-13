@@ -28,7 +28,8 @@
   <h1>🎵 YADMON Audio Lab</h1>
   <p class="sub">Original Game Boy–idiom compositions — style, never actual songs. Click anything to start (audio unlocks on first click). Listen, then tell me: keep, veto, or "recompose that one." Themes loop until you stop them.</p>
 
-  <h2>Themes (loop)</h2>
+  <h2>Themes (loop — generative)</h2>
+  <p class="sub">Each theme keeps its vibe (chords, bass, groove, tempo/key range) but the melody + arps are generated fresh every 4 bars — it never repeats. Each click rolls a new "day" (different key/tempo). Let one run a while to hear it evolve.</p>
   <div class="grid" id="themes"></div>
 
   <h2>Care-button taps</h2>
@@ -44,7 +45,7 @@
 import * as audio from "./js/audio.js";
 const make=(host,label,fn,cls="")=>{const b=document.createElement("button");b.textContent=label;if(cls)b.className=cls;b.onclick=()=>{audio.unlock();fn();};document.getElementById(host).appendChild(b);};
 
-["wake","focus","free"].forEach(t=>make("themes","▶ "+t, ()=>audio.playTheme(t), "theme"));
+["wake","focus","free"].forEach(t=>make("themes","▶ "+t, ()=>audio.playTheme(t,{daySeed: Math.floor(Math.random()*1e8)}), "theme"));
 document.getElementById("vol").addEventListener("input",e=>audio.setVolume(e.target.value/100));
 document.getElementById("stopAll").onclick=()=>audio.stopTheme();
 audio.setVolume(0.55);
