@@ -29,6 +29,10 @@
 
 * { box-sizing: border-box; }
 
+/* Ensure the `hidden` attribute always wins over explicit display rules
+   (e.g. #care-dock/#modal set display:flex, which would otherwise show them). */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;

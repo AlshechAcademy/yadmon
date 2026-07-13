@@ -34,7 +34,8 @@ export async function initTokenClient() {
 
 // Request an access token. `interactive` shows the consent/account popup;
 // non-interactive attempts a silent refresh (requires an active Google session).
-export function requestToken({ interactive = true } = {}) {
+export async function requestToken({ interactive = true } = {}) {
+  if (!tokenClient) await initTokenClient(); // lazy init if not pre-warmed
   return new Promise((resolve, reject) => {
     if (!tokenClient) return reject(new Error("token client not ready"));
     tokenClient.callback = (resp) => {

@@ -34,15 +34,16 @@ function currentEvents() {
 // --- boot -------------------------------------------------------------------
 async function boot() {
   store.initStore(app);
-  ui.setStatus("booting…");
+  ui.setStatus("loading…");
   ui.setClock(clock.now());
   ui.setCareHandlers({ onTap: engine.addTally, onUndo: engine.undoTally });
   debug.init({ onChange: renderNow });
 
   uiTimer = setInterval(uiTick, 1000);
 
-  try { await initTokenClient(); }
-  catch { ui.setStatus("calendar SDK blocked", "bad"); }
+  // Wire buttons + auth listener FIRST so sign-in works even if the Google
+  // Identity SDK is slow/blocked. The token client inits lazily on demand.
+  wireButtons();
 
   onAuthStateChanged(auth, (user) => {
     if (user && user.email === config.ownerEmail) {
@@ -59,12 +60,14 @@ async function boot() {
       currentUser = null;
       stopEngine();
       stopLivePoll();
+      ui.hideCareButton();
       ui.setStatus("signed out");
       ui.showSignedOut();
     }
   });
 
-  wireButtons();
+  // pre-warm the GIS token client without blocking boot
+  initTokenClient().catch(() => {});
 }
 
 function wireButtons() {
