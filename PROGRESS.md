@@ -2,7 +2,7 @@
 
 _Single source of truth for "what's done / what's next / open issues." Every session updates this._
 
-Last updated: 2026-07-13 (Phase 4 — sprites; Aquafin chosen)
+Last updated: 2026-07-13 (Phase 5 — audio built; owner listen/approve pending)
 
 ---
 
@@ -15,8 +15,8 @@ Last updated: 2026-07-13 (Phase 4 — sprites; Aquafin chosen)
 - [x] **Phase 2 — Engine + data (+ time machine)** ✅ ACCEPTED (owner verified 2026-07-13: compressed day ran, Firestore row written)
 - [~] **Phase 3 — Rules engine** 🟡 BUILT — owner accept test pending
 - [x] **Phase 4 — Sprites** ✅ (5 species, renderer, 10 trait systems, scene integration; owner chose Aquafin)
-- [ ] **Phase 5 — Audio** ← NEXT
-- [ ] Phase 6 — Brain (Gemini)
+- [~] **Phase 5 — Audio** 🟡 BUILT — owner listen/veto/recompose pending
+- [ ] **Phase 6 — Brain (Gemini)** ← next after audio approved
 - [ ] Phase 7 — Shakedown
 
 ---
@@ -130,3 +130,20 @@ Owner approved the direction and scrubbed traits 0→40 with zero continuity bre
 ### Notes
 - Companion shows SLEEP outside the 8:30–2:30 window / on rest days — use the ⏳ Time Machine to see it wake/work/celebrate on demand.
 - Species pool cycles on death: next = (speciesIdx+1) % 5.
+
+## Phase 5 — what got built
+
+New: `js/audio.js` (GB synth engine), `js/audio-data.js` (compositions), `audio-lab.html` (listen/veto/recompose tool). Wired: HUD volume/mute (`index.html`/`css`), audio unlock + theme-by-state (`main.js`), SFX triggers (`engine.js`).
+
+- **Engine (§10):** Web Audio, 4 voices — pulse ×2 (duty-cycle PeriodicWaves 12.5/25/50/75%), triangle, noise (K/S/H percussion). Lookahead scheduler (25ms tick, 120ms ahead) for tight timing. Master volume + mute. Unlocks on first user gesture.
+- **Themes (loop):** WAKE (~72bpm C-major lullaby, sparse), FOCUS (~132bpm A-minor arpeggio, seeded key/tempo per block), FREE (~144bpm C-major energizer). Daily-seed varies tempo ±6% and (focus) key.
+- **Jingles/SFX:** 10 per-care taps, confirm blip, T-60/T-2 chirps, block-start, call-tag, celebration tiers 1→4 (escalating: 2-note → riff → fanfare+bass → 4-bar mega w/ harmony+drums), first-ever, disappointment, neglect sting, evolution theme, death dirge.
+- **Triggers (engine):** care tap → per-care blip; block start → jingle; confirm tier → matching celebration/first-ever/disappointment; call tagged → call-tag; newly neglected → sting; death → dirge; evolution → theme. Theme-by-state in `main.js`: wake window → WAKE, WORK → FOCUS(seeded), FREE → FREE, SLEEP/out-of-window → silence.
+- Smoke-tested in browser: plays with **zero console errors**, scheduler + oscillators run.
+
+### Owner listen/veto/recompose (§10 — nothing ships until approved)
+Open **/audio-lab.html**, click through every theme + jingle. For each: keep / veto / "recompose that one." Sleep = silence is by design. Original melodies only (ruling #10).
+
+### Notes
+- Audio defaults ON at 0.5 volume; mute + volume live in the app HUD (top-right).
+- In the app, themes only start after the first click (browser autoplay policy) — the sign-in click covers it.
