@@ -282,3 +282,7 @@ html, body {
   background:linear-gradient(#1a2740,#0d1526);
   border:1px solid var(--line); border-radius:10px;
 }
+
+/* ---------- audio HUD (Phase 5) ---------- */
+#vol{width:72px;vertical-align:middle}
+#mute-btn{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:4px;cursor:pointer;font-size:12px;padding:1px 5px}

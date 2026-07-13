@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>YADMON — Audio Lab</title>
+<style>
+  :root{--bg:#0f1420;--panel:#172033;--line:#2c3a58;--ink:#e8f0ff;--dim:#90a0c0;--accent:#7bd88f;--warn:#f6c453;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,Menlo,Consolas,monospace;padding:24px;max-width:720px;margin:0 auto}
+  h1{color:var(--accent);font-size:20px}
+  h2{font-size:13px;color:var(--warn);margin:22px 0 8px;border-top:1px solid var(--line);padding-top:14px}
+  .sub{color:var(--dim);font-size:12px;line-height:1.5}
+  .grid{display:flex;flex-wrap:wrap;gap:8px}
+  button{font-family:inherit;font-size:13px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 14px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button.theme{font-weight:700}
+  button.stop{background:#3a1a1a;border-color:#a04040}
+  #vol{width:160px;vertical-align:middle}
+  .bar{position:sticky;top:0;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:10px;display:flex;align-items:center;gap:12px;z-index:5}
+</style>
+</head>
+<body>
+  <div class="bar">
+    <span>🔊 Volume</span><input id="vol" type="range" min="0" max="100" value="55" />
+    <button class="stop" id="stopAll">■ Stop theme</button>
+  </div>
+  <h1>🎵 YADMON Audio Lab</h1>
+  <p class="sub">Original Game Boy–idiom compositions — style, never actual songs. Click anything to start (audio unlocks on first click). Listen, then tell me: keep, veto, or "recompose that one." Themes loop until you stop them.</p>
+
+  <h2>Themes (loop)</h2>
+  <div class="grid" id="themes"></div>
+
+  <h2>Care-button taps</h2>
+  <div class="grid" id="taps"></div>
+
+  <h2>Celebration tiers (1 → 4)</h2>
+  <div class="grid" id="celebs"></div>
+
+  <h2>Moments</h2>
+  <div class="grid" id="moments"></div>
+
+<script type="module">
+import * as audio from "./js/audio.js";
+const make=(host,label,fn,cls="")=>{const b=document.createElement("button");b.textContent=label;if(cls)b.className=cls;b.onclick=()=>{audio.unlock();fn();};document.getElementById(host).appendChild(b);};
+
+["wake","focus","free"].forEach(t=>make("themes","▶ "+t, ()=>audio.playTheme(t), "theme"));
+document.getElementById("vol").addEventListener("input",e=>audio.setVolume(e.target.value/100));
+document.getElementById("stopAll").onclick=()=>audio.stopTheme();
+audio.setVolume(0.55);
+
+const cares=[["water","💧"],["fruit","🍓"],["love","❤️"],["walk","🐾"],["play","⚽"],["bath","🫧"],["groom","✨"],["exercise","💪"],["treats","🍪"],["rest","💤"]];
+cares.forEach(([c,e])=>make("taps",e+" "+c, ()=>audio.playSfx("tap_"+c)));
+
+[["celeb1","Tier 1 · beats yesterday"],["celeb2","Tier 2 · beats 3-day"],["celeb3","Tier 3 · beats 7-day"],["celeb4","Tier 4 · MONTH BEST"]].forEach(([s,l])=>make("celebs",l,()=>audio.playSfx(s)));
+
+[["firstEver","🌟 first-ever"],["disappoint","🥺 disappointment"],["neglect","⚠️ neglect sting"],["evolve","🧬 evolution"],["death","💀 death dirge"],["blockStart","▶ block start"],["chirp","T-60 chirp"],["getReady","T-2 get ready"],["confirm","confirm blip"],["callTag","call-tag"]].forEach(([s,l])=>make("moments",l,()=>audio.playSfx(s)));
+</script>
+</body>
+</html>

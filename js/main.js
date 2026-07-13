@@ -15,6 +15,8 @@ import * as engine from "./engine.js";
 import * as clock from "./clock.js";
 import * as debug from "./debug.js";
 import { drawCompanion } from "./sprites.js";
+import * as audio from "./audio.js";
+import { zoneMinutes, hhmmToMinutes } from "./time.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -26,6 +28,15 @@ let engineRunning = false;
 let liveEvents = [];
 let livePollTimer = null;
 let uiTimer = null;
+let audioReady = false;
+const audioHook = {
+  sfx: (n) => audio.playSfx(n),
+  tap: (care) => audio.playSfx("tap_" + care),
+  theme: (n, o) => audio.playTheme(n, o),
+  stop: () => audio.stopTheme(),
+};
+const CORE_START = hhmmToMinutes(config.coreWindowStart);
+const WIN_S = hhmmToMinutes(config.windowStart), WIN_E = hhmmToMinutes(config.windowEnd);
 
 // Events the engine + timeline should use right now: sim override or live.
 function currentEvents() {
@@ -85,6 +96,13 @@ function wireButtons() {
   });
 
   document.getElementById("signout-btn").addEventListener("click", () => signOut(auth));
+
+  // audio unlock on first gesture + HUD controls
+  document.addEventListener("click", () => { audio.unlock(); audioReady = true; }, { once: true });
+  const vol = document.getElementById("vol");
+  if (vol) vol.addEventListener("input", (e) => audio.setVolume(e.target.value / 100));
+  const mb = document.getElementById("mute-btn");
+  if (mb) mb.addEventListener("click", (e) => { e.target.textContent = audio.toggleMute() ? "🔇" : "🔊"; });
 }
 
 // --- engine -----------------------------------------------------------------
@@ -96,6 +114,7 @@ function startEngine() {
     autoplay: debug.isAutoplay,
     store,
     ui,
+    audio: audioHook,
   });
   engineRunning = true;
 }
@@ -139,11 +158,22 @@ function renderNow() {
   ui.renderDayPanel(events);
 }
 
+function updateTheme() {
+  if (!currentUser) { audio.stopTheme(); return; }
+  const mode = engine.getMode();
+  const nowMin = zoneMinutes(clock.now());
+  if (mode === "SLEEP" || nowMin < WIN_S || nowMin >= WIN_E) { audio.stopTheme(); return; }
+  if (nowMin < CORE_START) audio.playTheme("wake");
+  else if (mode === "WORK") audio.playTheme("focus", { seed: Math.floor(nowMin / 30) });
+  else audio.playTheme("free");
+}
+
 function uiTick() {
   ui.setClock(clock.now());
   if (currentUser) {
     ui.updateNowCursor(currentEvents(), clock.now());
     if (clock.isSim()) renderNow();
+    if (audioReady) updateTheme();
   }
 }
 

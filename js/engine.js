@@ -82,7 +82,7 @@ export function start(context) {
 }
 export function stop() { if (timer) clearInterval(timer); timer = null; }
 
-export function addTally(blockId) { tallies[blockId] = (tallies[blockId] || 0) + 1; ctx?.ui.updateTally(tallies[blockId]); }
+export function addTally(blockId) { tallies[blockId] = (tallies[blockId] || 0) + 1; ctx?.ui.updateTally(tallies[blockId]); const b = config.blockRegistry.find((x) => x.id === blockId); if (b) ctx?.audio?.tap(b.care); }
 export function undoTally(blockId) { tallies[blockId] = Math.max(0, (tallies[blockId] || 0) - 1); ctx?.ui.updateTally(tallies[blockId]); }
 export function getTally(blockId) { return tallies[blockId] || 0; }
 export function getCompanion() { return companion; }
@@ -127,7 +127,7 @@ async function tick() {
         askedCall.add(ev.id);
         const isCall = ctx.autoplay() ? true : await ctx.ui.askYesNo(`New event "${ev.title}" — sales call?`);
         callInfo[ev.id] = { isCall, followedUp: false, ev };
-        if (isCall) await ctx.store.logCall(today, ev);
+        if (isCall) { await ctx.store.logCall(today, ev); ctx.audio?.sfx("callTag"); }
         break;
       }
     }
@@ -160,6 +160,7 @@ async function tick() {
         activeEvtId = st.event.id;
         if (tallies[st.block.id] == null) tallies[st.block.id] = 0;
         ctx.ui.showCareButton(st.block, tallies[st.block.id]);
+        ctx.audio?.sfx("blockStart");
       }
       if (ctx.autoplay() && tallies[st.block.id] < 40) { tallies[st.block.id] += 1; ctx.ui.updateTally(tallies[st.block.id]); }
       setMode("WORK"); ctx.ui.showState("WORK", { block: st.block, event: st.event });
@@ -195,6 +196,7 @@ async function finalizeBlock(evtId) {
   if (activeEvtId === evtId) activeEvtId = null;
   ctx.ui.hideCareButton();
   ctx.ui.showCelebration?.(tier, block, value);
+  ctx.audio?.sfx({ FIRST: "firstEver", MONTH_BEST: "celeb4", BEATS_7: "celeb3", BEATS_3: "celeb2", BEATS_YEST: "celeb1", DISAPPOINTMENT: "disappoint" }[tier]);
   if (tier !== "DISAPPOINTMENT") celebrateUntil = Date.now() + 2200;
   ctx.ui.toast(`Logged ${value} — ${block.metric}`);
 }
@@ -216,7 +218,9 @@ async function runClose() {
   // reload the finalized row and run the rules
   row = (await ctx.store.getDay(today)) || {};
   if (!companion) companion = await ctx.store.ensureCompanion();
+  let newlyNeglected = false;
   for (let i = 1; i <= 10; i++) {
+    const wasNeg = companion.neglect["m" + i]?.state === "NEGLECTED";
     const missed = row["missed" + i] === true;
     const v = row["m" + i] ?? 0;
     const confirmed = !missed && row["m" + i] != null;
@@ -225,6 +229,7 @@ async function runClose() {
       companion.neglect["m" + i] || rules.freshNeglect(),
       { careReceived: care, confirmed, v }
     );
+    if (!wasNeg && companion.neglect["m" + i].state === "NEGLECTED") newlyNeglected = true;
   }
 
   const death = rules.deathCheck(companion.neglect);
@@ -235,9 +240,11 @@ async function runClose() {
     next.lastEvolvedForMonth = companion.lastEvolvedForMonth; // baselines continue (ruling #5)
     ctx.ui.showDeath?.(cause, companion);
     faintUntil = Date.now() + 2600;
+    ctx.audio?.sfx("death");
     companion = next;
     await ctx.store.setCompanion(companion);
   } else {
+    if (newlyNeglected) ctx.audio?.sfx("neglect");
     await ctx.store.setCompanion(companion);
   }
   closed = true;
@@ -270,6 +277,7 @@ async function maybeRunEvolution(now) {
     const stageBump = newStage > companion.maturityStage;
     companion.maturityStage = newStage;
     ctx.ui.showEvolution?.(winnerId, framing, stageBump, companion);
+    ctx.audio?.sfx("evolve");
   }
   companion.lastEvolvedForMonth = doneMonth;
   await ctx.store.setCompanion(companion);
