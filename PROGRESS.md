@@ -2,7 +2,7 @@
 
 _Single source of truth for "what's done / what's next / open issues." Every session updates this._
 
-Last updated: 2026-07-13 (Phase 3 built — awaiting owner accept test)
+Last updated: 2026-07-13 (Phase 4 — sprites; Aquafin chosen)
 
 ---
 
@@ -14,8 +14,8 @@ Last updated: 2026-07-13 (Phase 3 built — awaiting owner accept test)
 - [x] **Phase 1 — Skeleton + calendar** ✅ ACCEPTED (owner verified 2026-07-13: all 10 blocks color-matched, non-core flagged, live drag-sync confirmed)
 - [x] **Phase 2 — Engine + data (+ time machine)** ✅ ACCEPTED (owner verified 2026-07-13: compressed day ran, Firestore row written)
 - [~] **Phase 3 — Rules engine** 🟡 BUILT — owner accept test pending
-- [ ] **Phase 4 — Sprites** ← next after accept
-- [ ] Phase 5 — Audio
+- [x] **Phase 4 — Sprites** ✅ (5 species, renderer, 10 trait systems, scene integration; owner chose Aquafin)
+- [ ] **Phase 5 — Audio** ← NEXT
 - [ ] Phase 6 — Brain (Gemini)
 - [ ] Phase 7 — Shakedown
 
@@ -111,3 +111,22 @@ New file `js/rules.js` (pure §6 math). Extended `js/store.js` (history + compan
 2. **Neglect → death:** set a virtual date, turn sim ON + autoplay OFF is slow; easiest is: use Inject History with low numbers, then run several compressed empty days (sim off, no events) so metrics miss 3× → watch a death ceremony + a new companion; verify `companions/{id}` archive + reset `state/companion` in Firestore.
 3. **Evolution:** Inject history for a prior month, set virtual date to the 1st of the next month, run wake → watch the evolution toast; verify `traitLevels` bumped in `state/companion`.
 4. **Recap:** let a compressed day reach 2:25 → the recap card appears.
+
+## Phase 4 — what got built
+
+New: `js/sprites-data.js` (FROZEN 5-species pose matrices), `js/sprites.js` (renderer + trait systems), `preview.html` (approval harness). Wired into `index.html`/`css`/`js/main.js` scene; `js/config.js` starterSpecies; `js/store.js` starter-aware ensureCompanion; `js/engine.js` getScene/getMode + celebrate/faint transients.
+
+- **5 species** sharing one rig (§9): Sproutling(green/sprout), Emberpup(red/flame), Aquafin(blue/fin) ← **chosen starter**, Voltkit(yellow/bolt), Nocthorn(purple/horns). Each: 12 frozen 32×32 poses (idle×2, walk×2, sleep×2, eat, play, sad, celebrate×2, faint).
+- **Renderer** (`sprites.js`): nearest-neighbor pixel draw, animation catalog, deterministic transforms only — base matrices never edited (continuity guaranteed by construction, ruling #11 / §9).
+- **10 trait systems** as modular plated MECHA attachments that layer (spines behind → steel harness → pauldrons → gold collar/gem/chain/crown → floating halo/hearts/sparkles/bubbles). Size + maturity scale the whole sprite. Toys sit on a floor shelf (offset, no overlap).
+- **Neglect visuals**: desaturated/darkened palette + dirt specks + forced sad pose when any metric neglected.
+- **Scene integration**: `#room-canvas` in the day panel; `main.js` rAF loop draws `engine.getScene()` → SLEEP=sleep, WORK=play, FREE=walk (wanders), celebration/death transients, neglect=sad. Starter defaults to Aquafin even before first tick.
+- **Preview/approval** (`/preview.html`): species picker + per-trait 0→40 sliders + maturity + neglect toggles + pose buttons. Owner-approved.
+- `drawRetiree()` ready for background retiree minis (appear after deaths).
+
+### Owner accept (§12 Phase 4)
+Owner approved the direction and scrubbed traits 0→40 with zero continuity breaks; chose **Aquafin**. ✅
+
+### Notes
+- Companion shows SLEEP outside the 8:30–2:30 window / on rest days — use the ⏳ Time Machine to see it wake/work/celebrate on demand.
+- Species pool cycles on death: next = (speciesIdx+1) % 5.
