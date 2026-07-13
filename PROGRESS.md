@@ -2,7 +2,7 @@
 
 _Single source of truth for "what's done / what's next / open issues." Every session updates this._
 
-Last updated: 2026-07-13 (Phase 2 built — awaiting owner accept test)
+Last updated: 2026-07-13 (Phase 2 ACCEPTED)
 
 ---
 
@@ -12,8 +12,8 @@ Last updated: 2026-07-13 (Phase 2 built — awaiting owner accept test)
 - [x] GitHub Pages enabled by owner → https://alshechacademy.github.io/yadmon/
 - [x] **Phase 0 — Accounts & keys** ✅ DONE
 - [x] **Phase 1 — Skeleton + calendar** ✅ ACCEPTED (owner verified 2026-07-13: all 10 blocks color-matched, non-core flagged, live drag-sync confirmed)
-- [~] **Phase 2 — Engine + data (+ time machine)** 🟡 BUILT — owner accept test pending
-- [ ] Phase 3 — Rules engine ← next after accept
+- [x] **Phase 2 — Engine + data (+ time machine)** ✅ ACCEPTED (owner verified 2026-07-13: compressed day ran, Firestore row written)
+- [ ] **Phase 3 — Rules engine** ← NEXT
 - [ ] Phase 4 — Sprites
 - [ ] Phase 5 — Audio
 - [ ] Phase 6 — Brain (Gemini)
