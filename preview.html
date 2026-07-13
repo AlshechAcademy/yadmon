@@ -10,7 +10,8 @@
   body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-monospace,Menlo,Consolas,monospace;display:flex;min-height:100vh}
   #stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px}
   #room{background:linear-gradient(#1a2740,#0d1526);border:2px solid var(--line);border-radius:12px;image-rendering:pixelated}
-  #poseRow{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:520px}
+  #speciesRow,#poseRow{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:560px}
+  #speciesRow button{border-color:var(--accent)}
   #panel{width:340px;background:var(--panel);border-left:2px solid var(--line);padding:16px;overflow-y:auto;height:100vh}
   h1{font-size:15px;color:var(--accent);margin:0 0 2px}
   .sub{font-size:11px;color:var(--dim);margin-bottom:12px}
@@ -22,19 +23,19 @@
   button{font-family:inherit;font-size:12px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer}
   button.on{background:var(--accent);color:#0b1020;font-weight:700}
   .btnrow{display:flex;gap:6px;margin:10px 0}
-  select{font-family:inherit;font-size:12px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px;width:100%}
   .care{color:var(--dim);font-weight:400}
 </style>
 </head>
 <body>
   <div id="stage">
+    <div id="speciesRow"></div>
     <canvas id="room" width="520" height="460"></canvas>
     <div id="poseRow"></div>
-    <div class="sub">Species base is frozen data. Every slider below is a deterministic overlay — scrub freely, the base never breaks.</div>
+    <div class="sub">Base is frozen data. Every slider is a deterministic overlay — scrub freely, the base never breaks.</div>
   </div>
   <div id="panel">
     <h1>🌱 YADMON Sprite Lab</h1>
-    <div class="sub">Species 0 — "Sproutling" · approve me</div>
+    <div class="sub" id="speciesName">Species 0 — pick your starter</div>
     <label class="sub">Maturity stage <span id="matVal" class="val">0</span></label>
     <input id="mat" type="range" min="0" max="6" value="0" />
     <div class="btnrow">
@@ -47,6 +48,7 @@
 
 <script type="module">
 import { drawCompanion, ANIM } from "./js/sprites.js";
+import { SPECIES } from "./js/sprites-data.js";
 
 const TRAITS = [
   [1,"Shine","LinkedIn · water"],[2,"Size","WhatsApp · fruit"],[3,"Affection","Mass Email · love"],
@@ -54,39 +56,36 @@ const TRAITS = [
   [7,"Coat","Website · groom"],[8,"Buff","Content · exercise"],[9,"Bling","Automation · treats"],
   [10,"Serenity","Trello · rest"],
 ];
-const state = { anim:"idle", facing:1, maturity:0, traitLevels:{}, neglect:{} };
+const state = { speciesIdx:0, anim:"idle", facing:1, maturity:0, traitLevels:{}, neglect:{} };
 for(const [i] of TRAITS){ state.traitLevels["t"+i]=0; state.neglect["m"+i]={state:"OK"}; }
 
-// pose buttons
+const speciesRow=document.getElementById("speciesRow");
+SPECIES.forEach((sp,idx)=>{ const b=document.createElement("button"); b.textContent=sp.name; if(idx===0)b.classList.add("on");
+  b.onclick=()=>{ state.speciesIdx=idx; [...speciesRow.children].forEach(c=>c.classList.remove("on")); b.classList.add("on"); document.getElementById("speciesName").textContent=`Species ${idx} — ${sp.name}`; };
+  speciesRow.appendChild(b); });
+
 const poseRow=document.getElementById("poseRow");
-for(const name of Object.keys(ANIM)){
-  const b=document.createElement("button"); b.textContent=name; b.onclick=()=>{state.anim=name; [...poseRow.children].forEach(c=>c.classList.remove("on")); b.classList.add("on");};
-  if(name==="idle") b.classList.add("on");
-  poseRow.appendChild(b);
-}
-// trait sliders + neglect toggles
+for(const name of Object.keys(ANIM)){ const b=document.createElement("button"); b.textContent=name; b.onclick=()=>{state.anim=name;[...poseRow.children].forEach(c=>c.classList.remove("on"));b.classList.add("on");}; if(name==="idle")b.classList.add("on"); poseRow.appendChild(b); }
+
 const traitsEl=document.getElementById("traits");
-for(const [i,name,care] of TRAITS){
-  const wrap=document.createElement("div"); wrap.className="trait";
+for(const [i,name,care] of TRAITS){ const wrap=document.createElement("div"); wrap.className="trait";
   wrap.innerHTML=`<label><span>${i}. ${name} <span class="care">${care}</span></span><span><span class="val" id="v${i}">0</span> <input type="checkbox" class="neg" id="n${i}" title="neglect"></span></label><input type="range" id="s${i}" min="0" max="40" value="0">`;
   traitsEl.appendChild(wrap);
-  wrap.querySelector("#s"+i).addEventListener("input",e=>{state.traitLevels["t"+i]=+e.target.value; document.getElementById("v"+i).textContent=e.target.value;});
+  wrap.querySelector("#s"+i).addEventListener("input",e=>{state.traitLevels["t"+i]=+e.target.value;document.getElementById("v"+i).textContent=e.target.value;});
   wrap.querySelector("#n"+i).addEventListener("change",e=>{state.neglect["m"+i]={state:e.target.checked?"NEGLECTED":"OK"};});
 }
-document.getElementById("mat").addEventListener("input",e=>{state.maturity=+e.target.value; document.getElementById("matVal").textContent=e.target.value;});
+document.getElementById("mat").addEventListener("input",e=>{state.maturity=+e.target.value;document.getElementById("matVal").textContent=e.target.value;});
 document.getElementById("allMax").onclick=()=>{TRAITS.forEach(([i])=>{state.traitLevels["t"+i]=40;document.getElementById("s"+i).value=40;document.getElementById("v"+i).textContent=40;});};
 document.getElementById("reset").onclick=()=>{TRAITS.forEach(([i])=>{state.traitLevels["t"+i]=0;state.neglect["m"+i]={state:"OK"};document.getElementById("s"+i).value=0;document.getElementById("v"+i).textContent=0;document.getElementById("n"+i).checked=false;});state.maturity=0;document.getElementById("mat").value=0;document.getElementById("matVal").textContent=0;};
-document.getElementById("faceBtn").onclick=(e)=>{state.facing*=-1; e.target.textContent="Face "+(state.facing===1?"◀":"▶");};
+document.getElementById("faceBtn").onclick=(e)=>{state.facing*=-1;e.target.textContent="Face "+(state.facing===1?"◀":"▶");};
 
 const cv=document.getElementById("room"), ctx=cv.getContext("2d");
-let wanderX=0;
 function loop(t){
   ctx.clearRect(0,0,cv.width,cv.height);
-  // floor
   ctx.fillStyle="#0c1220"; ctx.fillRect(0,cv.height-40,cv.width,40);
   let cx=cv.width/2, facing=state.facing;
-  if(state.anim==="walk"){ wanderX=(Math.sin(t/2000))*120; cx=cv.width/2+wanderX; facing=Math.cos(t/2000)>0?1:-1; }
-  drawCompanion({ctx,cx,cy:cv.height/2+30,px:6,speciesIdx:0,anim:state.anim,tMs:t,traitLevels:state.traitLevels,maturityStage:state.maturity,neglect:state.neglect,facing});
+  if(state.anim==="walk"){ cx=cv.width/2+Math.sin(t/2000)*120; facing=Math.cos(t/2000)>0?1:-1; }
+  drawCompanion({ctx,cx,cy:cv.height/2+30,px:6,speciesIdx:state.speciesIdx,anim:state.anim,tMs:t,traitLevels:state.traitLevels,maturityStage:state.maturity,neglect:state.neglect,facing});
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
