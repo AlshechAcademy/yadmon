@@ -2,7 +2,7 @@
 
 _Single source of truth for "what's done / what's next / open issues." Every session updates this._
 
-Last updated: 2026-07-13 (Phase −1)
+Last updated: 2026-07-13 (Phase 0 complete)
 
 ---
 
@@ -10,8 +10,8 @@ Last updated: 2026-07-13 (Phase −1)
 
 - [x] **Phase −1 — Wire up Cowork + GitHub** ✅ DONE
 - [x] GitHub Pages enabled by owner → https://alshechacademy.github.io/yadmon/ (placeholder until Phase 1 ships index.html)
-- [ ] **Phase 0 — Accounts & keys** ← NEXT (owner + walkthrough)
-- [ ] Phase 1 — Skeleton + calendar
+- [x] **Phase 0 — Accounts & keys** ✅ DONE
+- [ ] **Phase 1 — Skeleton + calendar** ← NEXT (Cowork builds)
 - [ ] Phase 2 — Engine + data (+ time machine)
 - [ ] Phase 3 — Rules engine
 - [ ] Phase 4 — Sprites
@@ -45,10 +45,9 @@ _None blocking. Phase −1 fully accepted: repo live, pushed, Pages enabled._
 
 ---
 
-## Phase 0 needs (next session)
+## Phase 0 — what got done
 
-Per PLAN.md §13 checklist — all owner-driven, Cowork dictates the clicks:
-
-1. Google Cloud project "yadmon" (Workspace) → OAuth consent screen **Internal** → enable Calendar API → OAuth Web client with JS origin `https://alshechacademy.github.io`.
-2. AI Studio Gemini API key (kept restricted to Gemini API; pasted into the app later, never committed).
-3. Firebase project (Spark) → Auth Google provider on → add `alshechacademy.github.io` to authorized domains → create F
+- **Google Cloud** project `yadmon` created; OAuth consent screen set to **Internal**; Calendar API enabled; OAuth **Web** client created with JS origin `https://alshechacademy.github.io`.
+  - OAuth Client ID (public): `131501271611-f63fh6pgtr6llevj8aauq37id6g2vs9p.apps.googleusercontent.com`
+  - Client *secret* is NOT used by this app (browser token client is a public client) — owner keeps it, never committed.
+- **Gemini API key** created in AI Studio, tied to the `yadm
