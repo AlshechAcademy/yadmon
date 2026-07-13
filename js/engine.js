@@ -5,7 +5,7 @@
 
 import { config } from "./config.js";
 import {
-  zoneMinutes, hhmmToMinutes, dayBoundsRFC3339, isWorkday,
+  zoneMinutes, hhmmToMinutes, dayBoundsRFC3339, isWorkday, minutesToLabel,
 } from "./time.js";
 import * as rules from "./rules.js";
 
@@ -55,6 +55,9 @@ let askedCall = new Set();
 let callInfo = {};
 let followupQueue = [];
 let recapShown = false;
+let spokeWake = false;
+let lastNudgeMin = -999;
+let lastAmbientMin = -999;
 let celebrateUntil = 0; // real-ms transient for scene animation
 let faintUntil = 0;
 
@@ -66,12 +69,26 @@ function priorMonthVals(metricId, ym) {
   return historyRows.filter((r) => r.date.startsWith(ym)).map((r) => r["m" + metricId] ?? 0);
 }
 function lastPrior(metricId) { const v = priorVals(metricId); return v.length ? v[v.length - 1] : 0; }
+const bMetric = (id) => config.blockRegistry.find((b) => b.id === id)?.metric;
+const bCare = (id) => config.blockRegistry.find((b) => b.id === id)?.care;
+function metricStats(id, todayVal) {
+  const pv = priorVals(id), mm = priorMonthVals(id, today.slice(0, 7));
+  return { metric: bMetric(id), today: todayVal ?? null, yesterday: pv.length ? pv[pv.length - 1] : null,
+    avg3: Math.round(mean(pv.slice(-3))), avg7: Math.round(mean(pv.slice(-7))), monthBest: mm.length ? Math.max(...mm) : null };
+}
+function neglectCares() {
+  return companion ? Object.keys(companion.neglect).filter((k) => companion.neglect[k].state === "NEGLECTED").map((k) => bCare(+k.slice(1))) : [];
+}
+function brainCtx(moment, extra = {}) {
+  return { moment, clock: minutesToLabel(zoneMinutes(ctx.now())), neglect: neglectCares(), ...extra };
+}
 
 function resetDay(date) {
   today = date; closed = false; recapShown = false;
   tallies = {}; activeEvtId = null;
   finalizedEvt = new Set(); askedCall = new Set(); callInfo = {}; followupQueue = [];
   curMode = null;
+  spokeWake = false; lastNudgeMin = -999; lastAmbientMin = -999;
 }
 
 export function start(context) {
@@ -120,6 +137,11 @@ async function tick() {
     if (nowMin >= RECAP && !recapShown) { recapShown = true; await showRecap(); }
 
     const events = ctx.getEvents() || [];
+    if (!spokeWake && nowMin >= WIN_START) {
+      spokeWake = true;
+      ctx.brain?.speak("wake", brainCtx("wake", { todayBlocks: events.filter((x) => x.core).map((x) => x.block.metric) }));
+    }
+    if (nowMin - lastAmbientMin >= 20) { lastAmbientMin = nowMin; ctx.brain?.speak("ambient", brainCtx("ambient", {}), { ambient: true }); }
 
     // 1) call tagging (one prompt per tick)
     for (const ev of events) {
@@ -127,7 +149,7 @@ async function tick() {
         askedCall.add(ev.id);
         const isCall = ctx.autoplay() ? true : await ctx.ui.askYesNo(`New event "${ev.title}" — sales call?`);
         callInfo[ev.id] = { isCall, followedUp: false, ev };
-        if (isCall) { await ctx.store.logCall(today, ev); ctx.audio?.sfx("callTag"); }
+        if (isCall) { await ctx.store.logCall(today, ev); ctx.audio?.sfx("callTag"); ctx.brain?.speak("call_tag", brainCtx("call_tag", { event: ev.title })); }
         break;
       }
     }
@@ -161,6 +183,7 @@ async function tick() {
         if (tallies[st.block.id] == null) tallies[st.block.id] = 0;
         ctx.ui.showCareButton(st.block, tallies[st.block.id]);
         ctx.audio?.sfx("blockStart");
+        ctx.brain?.speak("block_start", brainCtx("block_start", { care: st.block.care, stats: metricStats(st.block.id) }));
       }
       if (ctx.autoplay() && tallies[st.block.id] < 40) { tallies[st.block.id] += 1; ctx.ui.updateTally(tallies[st.block.id]); }
       setMode("WORK"); ctx.ui.showState("WORK", { block: st.block, event: st.event });
@@ -169,6 +192,7 @@ async function tick() {
     // FREE
     if (activeEvtId) await finalizeBlock(activeEvtId);
     setMode("FREE"); ctx.ui.hideCareButton(); ctx.ui.showState("FREE", {});
+    if (nowMin - lastNudgeMin >= 15) { lastNudgeMin = nowMin; ctx.brain?.speak("free_nudge", brainCtx("free_nudge", { selfCare: config.selfCareSeeds })); }
   } finally {
     busy = false;
   }
@@ -199,6 +223,7 @@ async function finalizeBlock(evtId) {
   ctx.audio?.sfx({ FIRST: "firstEver", MONTH_BEST: "celeb4", BEATS_7: "celeb3", BEATS_3: "celeb2", BEATS_YEST: "celeb1", DISAPPOINTMENT: "disappoint" }[tier]);
   if (tier !== "DISAPPOINTMENT") celebrateUntil = Date.now() + 2200;
   ctx.ui.toast(`Logged ${value} — ${block.metric}`);
+  ctx.brain?.speak("block_done", brainCtx("block_done", { care: block.care, value, tier, stats: metricStats(block.id, value) }));
 }
 
 // Day close: finalize active, write misses for EVERY unconfirmed metric
@@ -241,10 +266,11 @@ async function runClose() {
     ctx.ui.showDeath?.(cause, companion);
     faintUntil = Date.now() + 2600;
     ctx.audio?.sfx("death");
+    ctx.brain?.speak("death", brainCtx("death", { cause }));
     companion = next;
     await ctx.store.setCompanion(companion);
   } else {
-    if (newlyNeglected) ctx.audio?.sfx("neglect");
+    if (newlyNeglected) { ctx.audio?.sfx("neglect"); ctx.brain?.speak("neglect", brainCtx("neglect", {})); }
     await ctx.store.setCompanion(companion);
   }
   closed = true;
@@ -278,6 +304,7 @@ async function maybeRunEvolution(now) {
     companion.maturityStage = newStage;
     ctx.ui.showEvolution?.(winnerId, framing, stageBump, companion);
     ctx.audio?.sfx("evolve");
+    ctx.brain?.speak("evolution", brainCtx("evolution", { trait: winnerId, framing }));
   }
   companion.lastEvolvedForMonth = doneMonth;
   await ctx.store.setCompanion(companion);
@@ -297,6 +324,7 @@ async function showRecap() {
   };
   const neglectWarn = companion ? Object.keys(companion.neglect).filter((k) => companion.neglect[k].state === "NEGLECTED") : [];
   ctx.ui.showRecap?.({ row, funnel, neglect: neglectWarn, companion });
+  ctx.brain?.speak("recap", brainCtx("recap", { funnel }));
 }
 
 // --- scene animation (for the room canvas) ---------------------------------

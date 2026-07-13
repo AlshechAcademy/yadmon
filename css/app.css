@@ -286,3 +286,15 @@ html, body {
 /* ---------- audio HUD (Phase 5) ---------- */
 #vol{width:72px;vertical-align:middle}
 #mute-btn{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:4px;cursor:pointer;font-size:12px;padding:1px 5px}
+
+/* ---------- speech bubble (Phase 6) ---------- */
+#speech-bubble{
+  max-width:340px; margin:0 auto 6px; padding:8px 12px;
+  background:#eaf2ff; color:#12203a; border-radius:12px; border:2px solid #12203a;
+  font-size:13px; line-height:1.35; text-align:center; position:relative;
+}
+#speech-bubble::after{ content:""; position:absolute; left:50%; bottom:-8px; transform:translateX(-50%);
+  border:7px solid transparent; border-top-color:#12203a; }
+#speech-bubble.silent{ background:#1e2a44; color:var(--ink); font-size:20px; letter-spacing:2px; border-color:var(--line); }
+#speech-bubble.silent::after{ border-top-color:var(--line); }
+#key-btn{ background:transparent; border:1px solid var(--line); color:var(--ink-dim); border-radius:4px; cursor:pointer; font-size:12px; padding:2px 6px; }

@@ -80,6 +80,7 @@ export const SFX = {
   getReady:  { bpm: 240, loop: false, tracks: [{ voice: "pulse", duty: 0.5, gain: 0.18, pattern: ["E5", "-", "E5"] }] },
   blockStart:{ bpm: 200, loop: false, tracks: [{ voice: "pulse", duty: 0.5, gain: 0.2, pattern: ["C5", "E5", "G5"] }] },
   callTag:   { bpm: 260, loop: false, tracks: [{ voice: "pulse", duty: 0.25, gain: 0.18, pattern: ["G4", "C5"] }] },
+  talk:      { bpm: 340, loop: false, tracks: [{ voice: "pulse", duty: 0.5, gain: 0.14, len: 0.5, pattern: ["A5", "D6"] }] },
 
   // celebration tiers 1→4 (escalating)
   celeb1: { bpm: 260, loop: false, tracks: [{ voice: "pulse", duty: 0.5, gain: 0.22, pattern: ["C5", "E5"] }] },

@@ -16,6 +16,7 @@ import * as clock from "./clock.js";
 import * as debug from "./debug.js";
 import { drawCompanion } from "./sprites.js";
 import * as audio from "./audio.js";
+import * as brain from "./brain.js";
 import { zoneMinutes, hhmmToMinutes, dayBoundsRFC3339 } from "./time.js";
 
 const app = initializeApp(firebaseConfig);
@@ -34,6 +35,16 @@ const audioHook = {
   tap: (care) => audio.playSfx("tap_" + care),
   theme: (n, o) => audio.playTheme(n, o),
   stop: () => audio.stopTheme(),
+};
+const brainHook = {
+  speak: async (moment, data, opts = {}) => {
+    let r;
+    try { r = await brain.say(moment, data, opts); }
+    catch { ui.emoteSilent(); ui.setBrainDot("bad"); return; }
+    if (r && r.text) { ui.showBubble(r.text); audio.playSfx("talk"); ui.setBrainDot("ok"); }
+    else if (r && r.reason === "nokey") { ui.emoteSilent(); ui.setBrainDot("warn"); }
+    // rate-skip → no bubble
+  },
 };
 const CORE_START = hhmmToMinutes(config.coreWindowStart);
 const WIN_S = hhmmToMinutes(config.windowStart), WIN_E = hhmmToMinutes(config.windowEnd);
@@ -103,6 +114,12 @@ function wireButtons() {
   if (vol) vol.addEventListener("input", (e) => audio.setVolume(e.target.value / 100));
   const mb = document.getElementById("mute-btn");
   if (mb) mb.addEventListener("click", (e) => { e.target.textContent = audio.toggleMute() ? "🔇" : "🔊"; });
+  const kb = document.getElementById("key-btn");
+  if (kb) kb.addEventListener("click", () => {
+    const k = prompt("Paste your Gemini API key (stored only in this browser, never uploaded):", brain.getKey());
+    if (k != null) { brain.setKey(k); ui.setBrainDot(brain.hasKey() ? "ok" : "warn"); if (brain.hasKey()) audio.playSfx("talk"); }
+  });
+  ui.setBrainDot(brain.hasKey() ? "" : "warn");
 }
 
 // --- engine -----------------------------------------------------------------
@@ -115,6 +132,7 @@ function startEngine() {
     store,
     ui,
     audio: audioHook,
+    brain: brainHook,
   });
   engineRunning = true;
 }

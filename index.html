@@ -21,6 +21,7 @@
         <button id="mute-btn" title="mute">🔊</button>
         <span id="clock" title="America/New_York">--:--</span>
         <span id="status-dot" class="dot" title="status"></span>
+        <span id="brain-dot" class="dot" title="companion brain"></span>
         <span id="status-text">booting…</span>
       </div>
     </header>
@@ -49,6 +50,7 @@
       </div>
 
       <div id="day-panel" class="panel" hidden>
+        <div id="speech-bubble" hidden></div>
         <canvas id="room-canvas" width="380" height="220"></canvas>
         <div id="state-banner"><span id="state-mode">—</span><span id="state-reason"></span></div>
         <p id="lineup"></p>
@@ -90,6 +92,7 @@
 
     <footer id="foot">
       <span>read-only calendar · $0 stack · single user</span>
+      <button id="key-btn" title="set Gemini key">🔑</button>
       <button id="debug-toggle" title="time machine">⏳</button>
     </footer>
   </div>

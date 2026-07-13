@@ -395,3 +395,22 @@ export function showRecap(data) {
     : "";
   showCard("📋 Daily recap", `${grid}<br><b>Funnel:</b><br>${funnel}${neg}<br><br>Good night.`);
 }
+
+
+// ===========================================================================
+// Phase 6 — companion speech bubble (live Gemini text) / silent emote (§8)
+// ===========================================================================
+let _bubbleTimer = null;
+export function showBubble(text, ms = 5200) {
+  const b = $("speech-bubble"); if (!b) return;
+  b.textContent = text; b.hidden = false; b.classList.remove("silent");
+  clearTimeout(_bubbleTimer); _bubbleTimer = setTimeout(() => { b.hidden = true; }, ms);
+}
+export function emoteSilent() {
+  const b = $("speech-bubble"); if (!b) return;
+  b.textContent = "…!"; b.hidden = false; b.classList.add("silent");
+  clearTimeout(_bubbleTimer); _bubbleTimer = setTimeout(() => { b.hidden = true; }, 1600);
+}
+export function setBrainDot(state) { // "" | "ok" | "warn" | "bad"
+  const d = $("brain-dot"); if (d) d.className = "dot" + (state ? " " + state : "");
+}
