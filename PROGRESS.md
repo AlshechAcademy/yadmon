@@ -2,7 +2,7 @@
 
 _Single source of truth for "what's done / what's next / open issues." Every session updates this._
 
-Last updated: 2026-07-13 (Phase 5 — audio built; owner listen/approve pending)
+Last updated: 2026-07-13 (Phase 5 — generative audio; owner listen pending)
 
 ---
 
@@ -147,3 +147,7 @@ Open **/audio-lab.html**, click through every theme + jingle. For each: keep / v
 ### Notes
 - Audio defaults ON at 0.5 volume; mute + volume live in the app HUD (top-right).
 - In the app, themes only start after the first click (browser autoplay policy) — the sign-in click covers it.
+
+## Phase 5 — generative themes (owner request)
+
+New `js/compose.js`. Themes are no longer static loops — each has an authored FOUNDATION (scale, chord progression, bass + drum templates, tempo/key ranges) with a PROCEDURALLY generated melody + arpeggio. Phrases (4 bars) regenerate continuously via a seeded RNG, so the tune never repeats. A **daySeed** (from the date) fixes each day's key + tempo; WORK also folds the block number in so each block has its own character. `audio.js` now calls `generatePhrase(name, daySeed, phraseIdx)` and regenerates at each phrase boundary. Deterministic (same seed → same phrase) but effectively endless within a day. Verified in-browser: plays clean, phrases evolve, no errors.
