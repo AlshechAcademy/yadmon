@@ -2,7 +2,7 @@
 
 _Single source of truth for "what's done / what's next / open issues." Every session updates this._
 
-Last updated: 2026-07-13 (Phase 1 built — awaiting owner accept test)
+Last updated: 2026-07-13 (Phase 1 ACCEPTED)
 
 ---
 
@@ -11,8 +11,8 @@ Last updated: 2026-07-13 (Phase 1 built — awaiting owner accept test)
 - [x] **Phase −1 — Wire up Cowork + GitHub** ✅ DONE
 - [x] GitHub Pages enabled by owner → https://alshechacademy.github.io/yadmon/ (placeholder until Phase 1 ships index.html)
 - [x] **Phase 0 — Accounts & keys** ✅ DONE
-- [~] **Phase 1 — Skeleton + calendar** 🟡 BUILT — owner accept test pending
-- [ ] Phase 2 — Engine + data (+ time machine) ← next after accept
+- [x] **Phase 1 — Skeleton + calendar** ✅ ACCEPTED (owner verified 2026-07-13: all 10 blocks color-matched, non-core flagged, live drag-sync confirmed)
+- [ ] **Phase 2 — Engine + data (+ time machine)** ← NEXT
 - [ ] Phase 2 — Engine + data (+ time machine)
 - [ ] Phase 3 — Rules engine
 - [ ] Phase 4 — Sprites
@@ -50,4 +50,4 @@ _None blocking. Phase −1 fully accepted: repo live, pushed, Pages enabled._
 
 - **Google Cloud** project `yadmon` created; OAuth consent screen set to **Internal**; Calendar API enabled; OAuth **Web** client created with JS origin `https://alshechacademy.github.io`.
   - OAuth Client ID (public): `131501271611-f63fh6pgtr6llevj8aauq37id6g2vs9p.apps.googleusercontent.com`
-  - Client *secret* is NOT used by this app (browser token client is
+  - Client *secret* is NOT used 
