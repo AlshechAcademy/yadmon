@@ -200,3 +200,134 @@ export function clearError() {
 export function setLastPoll(date = new Date()) {
   $("last-poll").textContent = "last synced " + minutesToLabel(zoneMinutes(date));
 }
+
+// ===========================================================================
+// Phase 2 — state banner, care dock, modal (confirm / yes-no / number pad)
+// ===========================================================================
+
+const CARE_ICON = {
+  water: "💧", fruit: "🍓", love: "❤️", walk: "🐾", play: "⚽",
+  bath: "🫧", groom: "✨", exercise: "💪", treats: "🍪", rest: "💤",
+};
+
+let careHandlers = { onTap: () => {}, onUndo: () => {} };
+let currentBlock = null;
+
+export function setCareHandlers(h) { careHandlers = { ...careHandlers, ...h }; }
+
+export function showState(mode, info = {}) {
+  const banner = $("state-banner");
+  if (!banner) return;
+  banner.className = mode;
+  $("state-mode").textContent =
+    mode === "WORK" ? "● WORK" : mode === "FREE" ? "○ FREE" : "z SLEEP";
+  let reason = info.reason || "";
+  if (mode === "WORK" && info.block) reason = `${info.event.title} — tap to log ${info.block.care}`;
+  if (mode === "FREE") reason = "free time — live your life";
+  $("state-reason").textContent = reason;
+}
+
+export function showCareButton(block, tally = 0) {
+  currentBlock = block;
+  const dock = $("care-dock");
+  dock.hidden = false;
+  const varName = "--care-" + block.care;
+  $("care-btn").style.background = `var(${varName})`;
+  $("care-icon").textContent = CARE_ICON[block.care] || "⭐";
+  $("care-label").textContent = block.care;
+  $("care-tally").textContent = tally;
+}
+
+export function updateTally(n) { $("care-tally").textContent = n; }
+
+export function hideCareButton() {
+  $("care-dock").hidden = true;
+  currentBlock = null;
+}
+
+// wire care buttons once (module scripts run after DOM is parsed)
+$("care-btn").addEventListener("click", () => { if (currentBlock) careHandlers.onTap(currentBlock.id); });
+$("care-undo").addEventListener("click", () => { if (currentBlock) careHandlers.onUndo(currentBlock.id); });
+
+// --- modal core -------------------------------------------------------------
+function openModal() { $("modal").hidden = false; }
+function closeModal() {
+  $("modal").hidden = true;
+  $("modal-pad").hidden = true;
+  $("modal-chips").innerHTML = "";
+}
+
+// Yes/No question → Promise<boolean>
+export function askYesNo(question) {
+  return new Promise((resolve) => {
+    $("modal-q").textContent = question;
+    $("modal-pad").hidden = true;
+    const chips = $("modal-chips");
+    chips.innerHTML = "";
+    const yes = document.createElement("button");
+    yes.className = "chip yes"; yes.textContent = "Yes";
+    const no = document.createElement("button");
+    no.className = "chip no"; no.textContent = "No";
+    yes.onclick = () => { closeModal(); resolve(true); };
+    no.onclick = () => { closeModal(); resolve(false); };
+    chips.append(yes, no);
+    openModal();
+  });
+}
+
+// Confirm a block tally → Promise<int>. Yes = tally; No opens the number pad.
+export function confirmCount(block, tally, ev) {
+  return new Promise((resolve) => {
+    $("modal-q").textContent =
+      `${ev ? ev.title : block.metric}: you logged ${tally} — ${block.metric}. Correct?`;
+    $("modal-pad").hidden = true;
+    const chips = $("modal-chips");
+    chips.innerHTML = "";
+    const yes = document.createElement("button");
+    yes.className = "chip yes"; yes.textContent = `Yes, ${tally}`;
+    const no = document.createElement("button");
+    no.className = "chip no"; no.textContent = "No, fix it";
+    yes.onclick = () => { closeModal(); resolve(tally); };
+    no.onclick = () => { openPad(tally, (v) => { closeModal(); resolve(v); }); };
+    chips.append(yes, no);
+    openModal();
+  });
+}
+
+// Number pad
+function openPad(initial, done) {
+  $("modal-chips").innerHTML = "";
+  const pad = $("modal-pad");
+  pad.hidden = false;
+  let val = String(initial ?? 0);
+  const disp = $("pad-display");
+  const render = () => { disp.textContent = val; };
+  render();
+
+  const keys = $("pad-keys");
+  keys.innerHTML = "";
+  const layout = ["1","2","3","4","5","6","7","8","9","⌫","0","✓"];
+  for (const k of layout) {
+    const b = document.createElement("button");
+    b.textContent = k;
+    b.onclick = () => {
+      if (k === "⌫") val = val.length > 1 ? val.slice(0, -1) : "0";
+      else if (k === "✓") { finish(); return; }
+      else val = val === "0" ? k : val + k;
+      render();
+    };
+    keys.appendChild(b);
+  }
+  const finish = () => done(parseInt(val, 10) || 0);
+  $("pad-ok").onclick = finish;
+  $("pad-cancel").onclick = () => done(initial ?? 0);
+}
+
+// --- toasts -----------------------------------------------------------------
+export function toast(msg, ms = 3200) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  $("toasts").appendChild(t);
+  setTimeout(() => t.remove(), ms);
+}
