@@ -130,7 +130,7 @@ export function drawCompanion(o) {
   }
   // 4 Explorer: overlay stages bandana -> boots -> satchel -> map
   if (lvl(4) > 0 && !isNeg(4)) {
-    if (lvl(4) >= 1) pxRect(ctx, cx, cyB, s, 10, 9, 12, 2, "#c94f4f"); // bandana
+    if (lvl(4) >= 1) pxRect(ctx, cx, cyB, s, 11, 17, 10, 1, "#c94f4f"); // bandana (neck scarf)
     if (lvl(4) >= 8) { pxRect(ctx, cx, cyB, s, 10, 27, 4, 2, "#5a3a1a"); pxRect(ctx, cx, cyB, s, 18, 27, 4, 2, "#5a3a1a"); } // boots
     if (lvl(4) >= 16) pxRect(ctx, cx, cyB, s, 22, 16, 4, 5, "#8a5a2a"); // satchel
     if (lvl(4) >= 24) pxRect(ctx, cx, cyB, s, 6, 16, 4, 4, "#e8d8a0"); // map

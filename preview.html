@@ -28,7 +28,7 @@
 </head>
 <body>
   <div id="stage">
-    <canvas id="room" width="420" height="380"></canvas>
+    <canvas id="room" width="520" height="460"></canvas>
     <div id="poseRow"></div>
     <div class="sub">Species base is frozen data. Every slider below is a deterministic overlay — scrub freely, the base never breaks.</div>
   </div>
@@ -86,7 +86,7 @@ function loop(t){
   ctx.fillStyle="#0c1220"; ctx.fillRect(0,cv.height-40,cv.width,40);
   let cx=cv.width/2, facing=state.facing;
   if(state.anim==="walk"){ wanderX=(Math.sin(t/2000))*120; cx=cv.width/2+wanderX; facing=Math.cos(t/2000)>0?1:-1; }
-  drawCompanion({ctx,cx,cy:cv.height/2+20,px:8,speciesIdx:0,anim:state.anim,tMs:t,traitLevels:state.traitLevels,maturityStage:state.maturity,neglect:state.neglect,facing});
+  drawCompanion({ctx,cx,cy:cv.height/2+30,px:6,speciesIdx:0,anim:state.anim,tMs:t,traitLevels:state.traitLevels,maturityStage:state.maturity,neglect:state.neglect,facing});
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
