@@ -274,3 +274,11 @@ html, body {
 #debug .close { float: right; cursor: pointer; color: var(--ink-dim); background: none; border: none; font-size: 16px; }
 .row2 { display: flex; gap: 8px; }
 .row2 > * { flex: 1; }
+
+/* ---------- companion room canvas (Phase 4) ---------- */
+#room-canvas{
+  display:block; width:100%; max-width:380px; height:auto; margin:0 auto 12px;
+  image-rendering:pixelated;
+  background:linear-gradient(#1a2740,#0d1526);
+  border:1px solid var(--line); border-radius:10px;
+}

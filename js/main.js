@@ -14,6 +14,7 @@ import * as store from "./store.js";
 import * as engine from "./engine.js";
 import * as clock from "./clock.js";
 import * as debug from "./debug.js";
+import { drawCompanion } from "./sprites.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -146,4 +147,21 @@ function uiTick() {
   }
 }
 
+// --- companion room animation (Phase 4) -------------------------------------
+function companionLoop(t) {
+  const cv = document.getElementById("room-canvas");
+  if (cv && currentUser) {
+    const cctx = cv.getContext("2d");
+    cctx.clearRect(0, 0, cv.width, cv.height);
+    cctx.fillStyle = "rgba(0,0,0,0.28)";
+    cctx.fillRect(0, cv.height - 22, cv.width, 22);
+    const sc = engine.getScene();
+    let cx = cv.width / 2, facing = 1;
+    if (sc.anim === "walk") { cx = cv.width / 2 + Math.sin(t / 2200) * (cv.width * 0.26); facing = Math.cos(t / 2200) > 0 ? 1 : -1; }
+    drawCompanion({ ctx: cctx, cx, cy: cv.height / 2 + 18, px: 4.5, speciesIdx: sc.speciesIdx, anim: sc.anim, tMs: t, traitLevels: sc.traitLevels, maturityStage: sc.maturityStage, neglect: sc.neglect, facing });
+  }
+  requestAnimationFrame(companionLoop);
+}
+
 boot();
+requestAnimationFrame(companionLoop);

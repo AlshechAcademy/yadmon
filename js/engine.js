@@ -55,6 +55,8 @@ let askedCall = new Set();
 let callInfo = {};
 let followupQueue = [];
 let recapShown = false;
+let celebrateUntil = 0; // real-ms transient for scene animation
+let faintUntil = 0;
 
 let historyRows = [];   // workday rows before today (baselines)
 let companion = null;   // live companion state
@@ -193,6 +195,7 @@ async function finalizeBlock(evtId) {
   if (activeEvtId === evtId) activeEvtId = null;
   ctx.ui.hideCareButton();
   ctx.ui.showCelebration?.(tier, block, value);
+  if (tier !== "DISAPPOINTMENT") celebrateUntil = Date.now() + 2200;
   ctx.ui.toast(`Logged ${value} — ${block.metric}`);
 }
 
@@ -231,6 +234,7 @@ async function runClose() {
     const next = ctx.store.newCompanion((companion.speciesIdx + 1) % ctx.store.SPECIES_COUNT, Date.now());
     next.lastEvolvedForMonth = companion.lastEvolvedForMonth; // baselines continue (ruling #5)
     ctx.ui.showDeath?.(cause, companion);
+    faintUntil = Date.now() + 2600;
     companion = next;
     await ctx.store.setCompanion(companion);
   } else {
@@ -285,6 +289,26 @@ async function showRecap() {
   };
   const neglectWarn = companion ? Object.keys(companion.neglect).filter((k) => companion.neglect[k].state === "NEGLECTED") : [];
   ctx.ui.showRecap?.({ row, funnel, neglect: neglectWarn, companion });
+}
+
+// --- scene animation (for the room canvas) ---------------------------------
+export function getMode() { return curMode; }
+export function getScene() {
+  const c = companion;
+  const now = Date.now();
+  const anyNeg = c && Object.values(c.neglect || {}).some((n) => n.state === "NEGLECTED");
+  let anim;
+  if (now < faintUntil) anim = "faint";
+  else if (now < celebrateUntil) anim = "celebrate";
+  else if (anyNeg) anim = "sad";
+  else anim = curMode === "SLEEP" ? "sleep" : curMode === "WORK" ? "play" : "walk";
+  return {
+    speciesIdx: c ? c.speciesIdx : (config.starterSpecies || 0),
+    anim,
+    traitLevels: c ? c.traitLevels : {},
+    maturityStage: c ? c.maturityStage : 0,
+    neglect: c ? c.neglect : {},
+  };
 }
 
 // --- test hooks -------------------------------------------------------------

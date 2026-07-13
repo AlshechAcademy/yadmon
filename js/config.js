@@ -44,6 +44,7 @@ export const config = {
   calendarId: "primary",
   pollSeconds: 60,
   ownerEmail: "steven@alshechacademy.org",
+  starterSpecies: 2, // Aquafin (chosen starter)
   geminiModel: "gemini-2.5-flash-lite",
   dailyBrainCap: 120,
   toneDirective:

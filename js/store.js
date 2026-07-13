@@ -10,6 +10,7 @@ import {
   getFirestore, doc, getDoc, setDoc, deleteDoc,
   collection, getDocs, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { config } from "./config.js";
 
 let db = null;
 
@@ -201,8 +202,20 @@ export function newCompanion(speciesIdx, bornMs) {
 // Get the live companion, creating a base one on first run.
 export async function ensureCompanion() {
   const c = await getCompanion();
-  if (c && c.traitLevels && c.neglect) return c;
-  const fresh = newCompanion(0, Date.now());
+  const starter = config.starterSpecies ?? 0;
+  if (c && c.traitLevels && c.neglect) {
+    // auto-adopt the chosen starter if the existing companion is a pristine
+    // default (never evolved / no traits) — won't clobber an evolved one.
+    const pristine = c.maturityStage === 0 && !c.lastEvolvedForMonth &&
+      Object.values(c.traitLevels).every((v) => !v);
+    if (pristine && c.speciesIdx !== starter) {
+      const f = newCompanion(starter, Date.now());
+      await setCompanion(f);
+      return f;
+    }
+    return c;
+  }
+  const fresh = newCompanion(starter, Date.now());
   await setCompanion(fresh);
   return fresh;
 }
