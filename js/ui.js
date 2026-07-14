@@ -70,6 +70,7 @@ export function renderTimeline(events) {
     }
     bar.title = `${minutesToLabel(ev.startMin)}–${minutesToLabel(ev.endMin)}  ${ev.title}`;
     bar.textContent = ev.title;
+    bar.addEventListener("click", () => showEventDetail(ev));
     track.appendChild(bar);
   }
   renderLegend(events);
@@ -135,6 +136,7 @@ export function updateNowCursor(events, now = new Date()) {
 
 function escapeHtml(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 export function renderDayPanel(events) {
+  if (!$("event-list")) return; // world layout has no list
   const core = events.filter((e) => e.core);
   const other = events.filter((e) => !e.core);
   $("lineup").textContent =
@@ -497,4 +499,15 @@ export function showStats(rows, blocks) {
     cards.appendChild(fc);
   }
   render(); d.hidden = false;
+}
+
+// Phase 7b — click a timeline bar to view its calendar description in-app.
+export function showEventDetail(ev) {
+  const el = $("timeline-detail"); if (!el) return;
+  const time = `${minutesToLabel(ev.startMin)}–${minutesToLabel(ev.endMin)}`;
+  el.innerHTML = `<button class="td-close">✕</button><span class="td-title">${escapeHtml(ev.title)}</span><span class="td-time">${time}</span>` +
+    (ev.location ? `<span class="td-loc">📍 ${escapeHtml(ev.location)}</span>` : "") +
+    `<div class="td-desc">${ev.description ? escapeHtml(ev.description) : "(no description)"}</div>`;
+  el.querySelector(".td-close").onclick = () => { el.hidden = true; };
+  el.hidden = false;
 }

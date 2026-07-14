@@ -32,7 +32,7 @@ let uiTimer = null;
 let audioReady = false;
 const CARE_EMOJI = { water:"💧", fruit:"🍓", love:"❤️", walk:"🐾", play:"⚽", bath:"🫧", groom:"✨", exercise:"💪", treats:"🍪", rest:"💤" };
 let curX = 0, behavior = { name: "idle", until: 0, dir: 1, start: 0 };
-let giveEffects = [], reactUntil = 0;
+let giveEffects = [], reactUntil = 0, worldX = 0;
 function spawnGive(care) { giveEffects.push({ care, born: performance.now(), seed: (Math.random()*2-1) }); reactUntil = performance.now() + 480; }
 const audioHook = {
   sfx: (n) => audio.playSfx(n),
@@ -227,44 +227,68 @@ function uiTick() {
 }
 
 // --- companion room animation (Phase 4) -------------------------------------
+// --- endless parallax world (Phase 7b) --------------------------------------
+const mod = (a, n) => ((a % n) + n) % n;
+const whash = (i) => { const x = Math.sin(i * 127.1) * 43758.5453; return x - Math.floor(x); };
+function fitCanvas(cv) { const w = cv.parentElement; if (!w) return; const cw = w.clientWidth, ch = w.clientHeight; if (cw && ch && (cv.width !== cw || cv.height !== ch)) { cv.width = cw; cv.height = ch; } }
+function wCloud(g, x, y) { g.beginPath(); g.arc(x, y, 12, 0, 7); g.arc(x + 14, y + 3, 10, 0, 7); g.arc(x - 14, y + 3, 10, 0, 7); g.fill(); }
+function wHills(g, W, off, crestY, amp, color, freq) { g.fillStyle = color; g.beginPath(); for (let x = 0; x <= W; x += 6) { const y = crestY - amp * Math.sin((x + off) * freq) - amp * 0.5 * Math.sin((x + off) * freq * 2.3 + 1); if (x === 0) g.moveTo(0, y); else g.lineTo(x, y); } g.lineTo(W, 99999); g.lineTo(0, 99999); g.closePath(); g.fill(); }
+function wTree(g, x, gy, night) { g.fillStyle = night ? "#241a34" : "#5a3a1e"; g.fillRect(x - 2, gy - 20, 4, 20); g.fillStyle = night ? "#1e2c52" : "#3f8a4a"; g.beginPath(); g.arc(x, gy - 24, 11, 0, 7); g.arc(x - 7, gy - 18, 8, 0, 7); g.arc(x + 7, gy - 18, 8, 0, 7); g.fill(); }
+function wBush(g, x, gy, night) { g.fillStyle = night ? "#1c2a4e" : "#3f8a4a"; g.beginPath(); g.arc(x, gy - 5, 8, 0, 7); g.arc(x - 7, gy - 2, 6, 0, 7); g.arc(x + 7, gy - 2, 6, 0, 7); g.fill(); }
+function wFlower(g, x, gy, night) { g.strokeStyle = night ? "#2a3a5a" : "#3d7d34"; g.lineWidth = 2; g.beginPath(); g.moveTo(x, gy); g.lineTo(x, gy - 10); g.stroke(); g.fillStyle = ["#ff6b6b", "#ffd83a", "#ff6bd6", "#4fa8ff"][Math.floor(whash(x) * 4)]; g.fillRect(x - 2, gy - 13, 4, 4); }
+function wRock(g, x, gy, night) { g.fillStyle = night ? "#28324e" : "#8a8f9c"; g.beginPath(); g.arc(x, gy - 2, 5, Math.PI, 0); g.fill(); }
+function drawWorld(g, W, H, wx, night) {
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  if (night) { sky.addColorStop(0, "#0a1030"); sky.addColorStop(1, "#182246"); }
+  else { sky.addColorStop(0, "#2a4d72"); sky.addColorStop(0.6, "#4785a4"); sky.addColorStop(1, "#86c6cc"); }
+  g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  const groundY = Math.round(H * 0.72), a1 = H * 0.10, a2 = H * 0.06;
+  if (night) {
+    g.fillStyle = "#eef"; for (let i = 0; i < 46; i++) { g.globalAlpha = 0.4 + whash(i + 5) * 0.6; g.fillRect(whash(i) * W, whash(i + 99) * groundY * 0.85, 2, 2); } g.globalAlpha = 1;
+    g.fillStyle = "#f2f0d8"; g.beginPath(); g.arc(W * 0.8, H * 0.18, 20, 0, 7); g.fill();
+  } else { g.fillStyle = "#ffe6a0"; g.beginPath(); g.arc(W * 0.82, H * 0.2, 24, 0, 7); g.fill(); }
+  g.fillStyle = night ? "rgba(180,190,220,0.14)" : "rgba(255,255,255,0.55)";
+  const cs = 240, co = mod(wx * 0.12, cs);
+  for (let x = -cs; x < W + cs; x += cs) { const i = Math.round((x + wx * 0.12) / cs); wCloud(g, x - co + whash(i) * 90, 28 + whash(i + 2) * 44); }
+  wHills(g, W, wx * 0.18, groundY - a1, a1 * 0.9, night ? "#182146" : "#39636e", 0.010);
+  wHills(g, W, wx * 0.42, groundY - a2, a2 * 0.9, night ? "#1e2c54" : "#3f8a55", 0.017);
+  g.fillStyle = night ? "#16204a" : "#4a9a3e"; g.fillRect(0, groundY, W, H - groundY);
+  g.fillStyle = night ? "#0f1838" : "#3d7d34"; g.fillRect(0, groundY, W, 4);
+  const ds = 130, doo = mod(wx, ds);
+  for (let x = -ds; x < W + ds; x += ds) { const i = Math.round((x + wx) / ds); const dx = x - doo + whash(i) * 46; const kind = Math.floor(whash(i + 3) * 4); if (kind === 0) wTree(g, dx, groundY, night); else if (kind === 1) wBush(g, dx, groundY, night); else if (kind === 2) wFlower(g, dx, groundY, night); else wRock(g, dx, groundY, night); }
+  return groundY;
+}
+
 function companionLoop(t) {
   const cv = document.getElementById("room-canvas");
-  if (cv && currentUser) {
+  if (cv && currentUser && cv.parentElement) {
+    fitCanvas(cv);
     const g = cv.getContext("2d");
-    g.clearRect(0, 0, cv.width, cv.height);
-    g.fillStyle = "rgba(0,0,0,0.28)"; g.fillRect(0, cv.height - 22, cv.width, 22);
+    const W = cv.width, H = cv.height, now = performance.now();
     const sc = engine.getScene();
-    const baseCy = cv.height / 2 + 18, maxX = cv.width * 0.30, now = performance.now();
-    let anim = sc.anim, facing = 1, cx = cv.width / 2, hop = 0;
-
+    const night = sc.anim === "sleep";
+    let anim = sc.anim, facing = 1, hop = 0, speed = night ? 0 : 0.5;
     if (sc.anim === "walk") {
-      // varied idle behaviours so it never looks static (free time)
-      if (t > behavior.until) {
-        const opts = ["idle", "idle", "idle", "hop", "lookL", "lookR", "wander", "wander"];
-        behavior = { name: opts[(Math.random() * opts.length) | 0], until: t + 1400 + Math.random() * 2600, dir: Math.random() < 0.5 ? -1 : 1, start: t };
-      }
-      if (behavior.name === "wander") { curX += behavior.dir * 0.5; facing = behavior.dir; anim = "walk"; }
-      else if (behavior.name === "lookL") { facing = -1; anim = "idle"; }
-      else if (behavior.name === "lookR") { facing = 1; anim = "idle"; }
-      else if (behavior.name === "hop") { anim = "idle"; hop = Math.max(0, Math.sin(((t - behavior.start) / 260) * Math.PI)) * 13; }
-      else anim = "idle";
-      curX = Math.max(-maxX, Math.min(maxX, curX));
-      cx = cv.width / 2 + curX;
-    } else curX = 0;
-    if (now < reactUntil) anim = "eat"; // chomp when you give it something
-
-    drawCompanion({ ctx: g, cx, cy: baseCy - hop, px: 4.5, speciesIdx: sc.speciesIdx, anim, tMs: t, traitLevels: sc.traitLevels, maturityStage: sc.maturityStage, neglect: sc.neglect, facing });
-
-    // flying care-give items → satisfying dopamine per tap
+      if (t > behavior.until) { const opts = ["idle", "idle", "idle", "hop", "lookL", "lookR", "wander", "wander"]; behavior = { name: opts[(Math.random() * opts.length) | 0], until: t + 1400 + Math.random() * 2600, dir: Math.random() < 0.5 ? -1 : 1, start: t }; }
+      if (behavior.name === "wander") { anim = "walk"; facing = behavior.dir; speed = 1.7 * behavior.dir; }
+      else if (behavior.name === "lookL") { anim = "idle"; facing = -1; speed = 0.3; }
+      else if (behavior.name === "lookR") { anim = "idle"; facing = 1; speed = 0.3; }
+      else if (behavior.name === "hop") { anim = "idle"; hop = Math.max(0, Math.sin(((t - behavior.start) / 260) * Math.PI)) * 14; speed = 0.4; }
+      else { anim = "idle"; speed = 0.5; }
+    }
+    if (now < reactUntil) anim = "eat";
+    worldX += speed;
+    const groundY = drawWorld(g, W, H, worldX, night);
+    const px = Math.max(3, Math.round(H / 58)), cx = W / 2, cy = groundY - 12 * px - hop;
+    drawCompanion({ ctx: g, cx, cy, px, speciesIdx: sc.speciesIdx, anim, tMs: t, traitLevels: sc.traitLevels, maturityStage: sc.maturityStage, neglect: sc.neglect, facing });
     giveEffects = giveEffects.filter((e) => now - e.born < 720);
     g.textAlign = "center"; g.textBaseline = "middle";
     for (const e of giveEffects) {
       const p = Math.min(1, (now - e.born) / 430);
-      const sx = cv.width / 2 + e.seed * cv.width * 0.32, sy = cv.height - 24;
-      const tx = cx, ty = baseCy - 6;
-      const ix = sx + (tx - sx) * p, iy = sy + (ty - sy) * p - Math.sin(p * Math.PI) * 42;
-      if (p < 1) { g.font = "20px serif"; g.fillText(CARE_EMOJI[e.care] || "⭐", ix, iy); }
-      else { const bp = (now - e.born - 430) / 290; g.fillStyle = "#fff3a0"; for (let k = 0; k < 7; k++) { const a = (k / 7) * 6.283; const r = bp * 18; g.fillRect(tx + Math.cos(a) * r - 1, ty + Math.sin(a) * r - 1, 3, 3); } }
+      const sx = W / 2 + e.seed * W * 0.34, sy = H - 20, tx = cx, ty = cy - 4;
+      const ix = sx + (tx - sx) * p, iy = sy + (ty - sy) * p - Math.sin(p * Math.PI) * 46;
+      if (p < 1) { g.font = Math.round(px * 5) + "px serif"; g.fillText(CARE_EMOJI[e.care] || "⭐", ix, iy); }
+      else { const bp = (now - e.born - 430) / 290; g.fillStyle = "#fff3a0"; for (let k = 0; k < 8; k++) { const a = (k / 8) * 6.283, r = bp * 20; g.fillRect(tx + Math.cos(a) * r - 1, ty + Math.sin(a) * r - 1, 3, 3); } }
     }
     g.textAlign = "start"; g.textBaseline = "alphabetic";
   }
