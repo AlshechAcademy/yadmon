@@ -63,7 +63,7 @@ export async function say(moment, ctxPacket, { ambient = false } = {}) {
   const body = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts: [{ text: user }] }],
-    generationConfig: { temperature: 1.0, maxOutputTokens: 80, topP: 0.95 },
+    generationConfig: { temperature: 1.0, maxOutputTokens: 220, topP: 0.95 },
   };
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${getModel()}:generateContent?key=${encodeURIComponent(getKey())}`;
   const res = await fetch(url, {
@@ -83,9 +83,11 @@ export async function say(moment, ctxPacket, { ambient = false } = {}) {
 // usable models and auto-pick the best flash-lite/flash, saving it. Fixes the
 // perpetual "…!" caused by an invalid model id.
 const MODEL_PREFS = [
-  "gemini-2.5-flash-lite", "gemini-2.5-flash-lite-preview-06-17",
-  "gemini-2.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash",
+  "gemini-2.0-flash-lite", "gemini-2.0-flash",
+  "gemini-2.0-flash-lite-001", "gemini-2.0-flash-001",
   "gemini-1.5-flash-8b", "gemini-1.5-flash",
+  "gemini-2.5-flash-lite", "gemini-2.5-flash",
+  "gemini-flash-lite-latest", "gemini-flash-latest",
 ];
 
 export async function listModels() {
@@ -103,9 +105,12 @@ async function testModel(model) {
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(getKey())}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hi" }] }], generationConfig: { maxOutputTokens: 5 } }),
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Reply with the single word: ok" }] }], generationConfig: { maxOutputTokens: 40, temperature: 0 } }),
     });
-    return res.ok;
+    if (!res.ok) return false;
+    const d = await res.json();
+    const t = d?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return !!(t && t.trim()); // must actually produce text (skips thinking-only replies)
   } catch { return false; }
 }
 
