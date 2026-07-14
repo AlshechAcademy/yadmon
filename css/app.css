@@ -363,3 +363,6 @@ html, body {
   position: absolute; right: 8px; top: 6px; cursor: pointer;
   color: var(--ink-dim); background: none; border: none; font-size: 15px;
 }
+
+/* full-bleed world: override the Phase-4 room-canvas cap */
+#room-canvas { max-width: none !important; height: 100% !important; border: none !important; border-radius: 0 !important; margin: 0 !important; }

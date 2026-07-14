@@ -260,6 +260,8 @@ async function runClose() {
   // reload the finalized row and run the rules
   row = (await ctx.store.getDay(today)) || {};
   if (!companion) companion = await ctx.store.ensureCompanion();
+  if (companion.lastCloseDate !== today) {
+  companion.lastCloseDate = today;
   let newlyNeglected = false;
   for (let i = 1; i <= 10; i++) {
     const wasNeg = companion.neglect["m" + i]?.state === "NEGLECTED";
@@ -280,6 +282,7 @@ async function runClose() {
     await ctx.store.archiveCompanion(companion, cause);
     const next = ctx.store.newCompanion((companion.speciesIdx + 1) % ctx.store.SPECIES_COUNT, Date.now());
     next.lastEvolvedForMonth = companion.lastEvolvedForMonth; // baselines continue (ruling #5)
+    next.lastCloseDate = today;
     ctx.ui.showDeath?.(cause, companion);
     faintUntil = Date.now() + 2600;
     ctx.audio?.sfx("death");
@@ -290,6 +293,7 @@ async function runClose() {
     if (newlyNeglected) { ctx.audio?.sfx("neglect"); ctx.brain?.speak("neglect", brainCtx("neglect", {})); }
     await ctx.store.setCompanion(companion);
   }
+  } // once-per-day close guard
   closed = true;
   ctx.ui.toast("Day closed — numbers locked in.");
 }
