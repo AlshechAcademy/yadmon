@@ -58,6 +58,8 @@
         <div class="row">
           <div>
             <button id="signout-btn" class="btn btn-ghost">Sign out</button>
+            <button id="numbers-btn" class="btn btn-ghost">📊 Numbers</button>
+            <button id="stats-btn" class="btn btn-ghost">📈 Stats</button>
             <button id="connect-live-btn" class="btn">Connect Google Calendar</button>
           </div>
           <span id="last-poll"></span>
@@ -95,6 +97,9 @@
       <button id="key-btn" title="set Gemini key">🔑</button>
       <button id="debug-toggle" title="time machine">⏳</button>
     </footer>
+
+    <div id="numbers-drawer" class="drawer" hidden></div>
+    <div id="stats-drawer" class="drawer" hidden></div>
   </div>
 
   <script type="module" src="./js/main.js"></script>

@@ -113,6 +113,8 @@ function shape(items) {
     out.push({
       id: ev.id,
       title: ev.summary || "(untitled)",
+      description: (ev.description || "").trim(),
+      location: (ev.location || "").trim(),
       start: startDate,
       end: endDate,
       startMin: zoneMinutes(startDate),

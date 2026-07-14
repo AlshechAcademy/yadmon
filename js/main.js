@@ -30,6 +30,10 @@ let liveEvents = [];
 let livePollTimer = null;
 let uiTimer = null;
 let audioReady = false;
+const CARE_EMOJI = { water:"💧", fruit:"🍓", love:"❤️", walk:"🐾", play:"⚽", bath:"🫧", groom:"✨", exercise:"💪", treats:"🍪", rest:"💤" };
+let curX = 0, behavior = { name: "idle", until: 0, dir: 1, start: 0 };
+let giveEffects = [], reactUntil = 0;
+function spawnGive(care) { giveEffects.push({ care, born: performance.now(), seed: (Math.random()*2-1) }); reactUntil = performance.now() + 480; }
 const audioHook = {
   sfx: (n) => audio.playSfx(n),
   tap: (care) => audio.playSfx("tap_" + care),
@@ -59,7 +63,10 @@ async function boot() {
   store.initStore(app);
   ui.setStatus("loading…");
   ui.setClock(clock.now());
-  ui.setCareHandlers({ onTap: engine.addTally, onUndo: engine.undoTally });
+  ui.setCareHandlers({
+    onTap: (id) => { engine.addTally(id); const c = config.blockRegistry.find((b) => b.id === id); if (c) spawnGive(c.care); },
+    onUndo: engine.undoTally,
+  });
   debug.init({ onChange: renderNow });
 
   uiTimer = setInterval(uiTick, 1000);
@@ -75,7 +82,10 @@ async function boot() {
       ui.setStatus(`signed in · ${user.email}`, "ok");
       ui.showDay();
       startEngine();
+      // auto-reconnect calendar silently while the Google session is active (no click needed)
       if (hasValidToken()) startLivePoll();
+      else requestToken({ interactive: false }).then(() => startLivePoll()).catch(() => {});
+      if (brain.hasKey()) brain.verifyAndPickModel().then((r) => ui.setBrainDot(r.ok ? "ok" : "bad")).catch(() => ui.setBrainDot("bad"));
     } else if (user) {
       ui.showError(`Locked to ${config.ownerEmail}. You signed in as ${user.email}.`);
       signOut(auth);
@@ -115,10 +125,28 @@ function wireButtons() {
   const mb = document.getElementById("mute-btn");
   if (mb) mb.addEventListener("click", (e) => { e.target.textContent = audio.toggleMute() ? "🔇" : "🔊"; });
   const kb = document.getElementById("key-btn");
-  if (kb) kb.addEventListener("click", () => {
+  if (kb) kb.addEventListener("click", async () => {
     const k = prompt("Paste your Gemini API key (stored only in this browser, never uploaded):", brain.getKey());
-    if (k != null) { brain.setKey(k); ui.setBrainDot(brain.hasKey() ? "ok" : "warn"); if (brain.hasKey()) audio.playSfx("talk"); }
+    if (k == null) return;
+    brain.setKey(k);
+    if (!brain.hasKey()) { ui.setBrainDot("warn"); return; }
+    ui.setBrainDot("warn");
+    const r = await brain.verifyAndPickModel();
+    if (r.ok) { ui.setBrainDot("ok"); audio.playSfx("talk"); alert("✅ Aquafin's brain is connected!\nModel: " + r.model + "  (" + r.count + " available)"); }
+    else { ui.setBrainDot("bad"); alert("❌ Couldn't connect: " + r.error + "\n\nMake sure it's a valid Gemini API key with the Generative Language API enabled."); }
   });
+  const nb = document.getElementById("numbers-btn");
+  if (nb) nb.addEventListener("click", async () => {
+    const t = engine.getToday(); if (!t) return;
+    const row = (await store.getDay(t)) || {};
+    ui.showNumbersPanel(config.blockRegistry, row, async (changes) => {
+      for (const id of Object.keys(changes.metrics)) await engine.setMetric(+id, changes.metrics[id]);
+      for (const f of Object.keys(changes.fields)) await engine.setField(f, changes.fields[f]);
+      renderNow();
+    });
+  });
+  const sb = document.getElementById("stats-btn");
+  if (sb) sb.addEventListener("click", async () => { ui.showStats(await store.allDays(), config.blockRegistry); });
   ui.setBrainDot(brain.hasKey() ? "" : "warn");
 }
 
@@ -202,14 +230,43 @@ function uiTick() {
 function companionLoop(t) {
   const cv = document.getElementById("room-canvas");
   if (cv && currentUser) {
-    const cctx = cv.getContext("2d");
-    cctx.clearRect(0, 0, cv.width, cv.height);
-    cctx.fillStyle = "rgba(0,0,0,0.28)";
-    cctx.fillRect(0, cv.height - 22, cv.width, 22);
+    const g = cv.getContext("2d");
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.fillStyle = "rgba(0,0,0,0.28)"; g.fillRect(0, cv.height - 22, cv.width, 22);
     const sc = engine.getScene();
-    let cx = cv.width / 2, facing = 1;
-    if (sc.anim === "walk") { cx = cv.width / 2 + Math.sin(t / 2200) * (cv.width * 0.26); facing = Math.cos(t / 2200) > 0 ? 1 : -1; }
-    drawCompanion({ ctx: cctx, cx, cy: cv.height / 2 + 18, px: 4.5, speciesIdx: sc.speciesIdx, anim: sc.anim, tMs: t, traitLevels: sc.traitLevels, maturityStage: sc.maturityStage, neglect: sc.neglect, facing });
+    const baseCy = cv.height / 2 + 18, maxX = cv.width * 0.30, now = performance.now();
+    let anim = sc.anim, facing = 1, cx = cv.width / 2, hop = 0;
+
+    if (sc.anim === "walk") {
+      // varied idle behaviours so it never looks static (free time)
+      if (t > behavior.until) {
+        const opts = ["idle", "idle", "idle", "hop", "lookL", "lookR", "wander", "wander"];
+        behavior = { name: opts[(Math.random() * opts.length) | 0], until: t + 1400 + Math.random() * 2600, dir: Math.random() < 0.5 ? -1 : 1, start: t };
+      }
+      if (behavior.name === "wander") { curX += behavior.dir * 0.5; facing = behavior.dir; anim = "walk"; }
+      else if (behavior.name === "lookL") { facing = -1; anim = "idle"; }
+      else if (behavior.name === "lookR") { facing = 1; anim = "idle"; }
+      else if (behavior.name === "hop") { anim = "idle"; hop = Math.max(0, Math.sin(((t - behavior.start) / 260) * Math.PI)) * 13; }
+      else anim = "idle";
+      curX = Math.max(-maxX, Math.min(maxX, curX));
+      cx = cv.width / 2 + curX;
+    } else curX = 0;
+    if (now < reactUntil) anim = "eat"; // chomp when you give it something
+
+    drawCompanion({ ctx: g, cx, cy: baseCy - hop, px: 4.5, speciesIdx: sc.speciesIdx, anim, tMs: t, traitLevels: sc.traitLevels, maturityStage: sc.maturityStage, neglect: sc.neglect, facing });
+
+    // flying care-give items → satisfying dopamine per tap
+    giveEffects = giveEffects.filter((e) => now - e.born < 720);
+    g.textAlign = "center"; g.textBaseline = "middle";
+    for (const e of giveEffects) {
+      const p = Math.min(1, (now - e.born) / 430);
+      const sx = cv.width / 2 + e.seed * cv.width * 0.32, sy = cv.height - 24;
+      const tx = cx, ty = baseCy - 6;
+      const ix = sx + (tx - sx) * p, iy = sy + (ty - sy) * p - Math.sin(p * Math.PI) * 42;
+      if (p < 1) { g.font = "20px serif"; g.fillText(CARE_EMOJI[e.care] || "⭐", ix, iy); }
+      else { const bp = (now - e.born - 430) / 290; g.fillStyle = "#fff3a0"; for (let k = 0; k < 7; k++) { const a = (k / 7) * 6.283; const r = bp * 18; g.fillRect(tx + Math.cos(a) * r - 1, ty + Math.sin(a) * r - 1, 3, 3); } }
+    }
+    g.textAlign = "start"; g.textBaseline = "alphabetic";
   }
   requestAnimationFrame(companionLoop);
 }

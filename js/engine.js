@@ -103,6 +103,23 @@ export function addTally(blockId) { tallies[blockId] = (tallies[blockId] || 0) +
 export function undoTally(blockId) { tallies[blockId] = Math.max(0, (tallies[blockId] || 0) - 1); ctx?.ui.updateTally(tallies[blockId]); }
 export function getTally(blockId) { return tallies[blockId] || 0; }
 export function getCompanion() { return companion; }
+export function getToday() { return today; }
+// Manually set/correct a metric for today (numbers panel). Computes real §6.1
+// care, marks it confirmed, and finalizes that block so close won't miss it.
+export async function setMetric(blockId, value) {
+  if (!ctx || !today) return { ok: false };
+  const v = Math.max(0, Math.floor(Number(value) || 0));
+  const B = lastPrior(blockId);
+  const care = rules.careReceived(v, true, B);
+  await ctx.store.writeMetric(today, blockId, v, care, false);
+  for (const ev of (ctx.getEvents() || [])) if (ev.core && ev.block.id === blockId) finalizedEvt.add(ev.id);
+  return { ok: true, care };
+}
+// Correct a call-funnel field (m11_calls / m12_attended / m13_signups).
+export async function setField(field, value) {
+  if (!ctx || !today) return;
+  await ctx.store.fixField(today, field, Math.max(0, Math.floor(Number(value) || 0)));
+}
 export function snapshot() {
   return { today, closed, curMode, activeEvtId, tallies: { ...tallies },
     finalized: [...finalizedEvt], companion };

@@ -77,3 +77,35 @@ export async function say(moment, ctxPacket, { ambient = false } = {}) {
   if (!text) throw new Error("empty");
   return { text: text.replace(/^["']|["']$/g, "") };
 }
+
+// --- model discovery / self-heal (Phase 7) ----------------------------------
+// The plan's default model id may not exist on a given key. List the account's
+// usable models and auto-pick the best flash-lite/flash, saving it. Fixes the
+// perpetual "…!" caused by an invalid model id.
+const MODEL_PREFS = [
+  "gemini-2.5-flash-lite", "gemini-2.5-flash-lite-preview-06-17",
+  "gemini-2.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash",
+  "gemini-1.5-flash-8b", "gemini-1.5-flash",
+];
+
+export async function listModels() {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(getKey())}`);
+  if (!res.ok) throw new Error("models list HTTP " + res.status);
+  const d = await res.json();
+  return (d.models || [])
+    .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map((m) => m.name.replace(/^models\//, ""));
+}
+
+// Verify the key works and pick a valid model. Returns {ok, model, count} or {ok:false, error}.
+export async function verifyAndPickModel() {
+  if (!hasKey()) return { ok: false, error: "no key set" };
+  let models;
+  try { models = await listModels(); }
+  catch (e) { return { ok: false, error: String(e.message || e) }; }
+  if (!models.length) return { ok: false, error: "this key has no models that support generateContent" };
+  const pick = MODEL_PREFS.find((p) => models.includes(p))
+    || models.find((m) => /flash/.test(m)) || models[0];
+  setModel(pick);
+  return { ok: true, model: pick, count: models.length };
+}

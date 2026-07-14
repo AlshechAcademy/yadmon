@@ -133,38 +133,34 @@ export function updateNowCursor(events, now = new Date()) {
   }
 }
 
+function escapeHtml(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 export function renderDayPanel(events) {
   const core = events.filter((e) => e.core);
   const other = events.filter((e) => !e.core);
   $("lineup").textContent =
     `${core.length} core block${core.length === 1 ? "" : "s"} on the board` +
     (other.length ? ` · ${other.length} other event${other.length === 1 ? "" : "s"}` : "");
-
   const list = $("event-list");
   list.innerHTML = "";
   for (const ev of events) {
-    const li = document.createElement("li");
-    const time = document.createElement("span");
-    time.className = "time";
+    const item = document.createElement("li"); item.className = "evt-item";
+    const head = document.createElement("div"); head.className = "evt-head";
+    const time = document.createElement("span"); time.className = "time";
     time.textContent = `${minutesToLabel(ev.startMin)}–${minutesToLabel(ev.endMin)}`;
-    const tag = document.createElement("span");
-    tag.className = "tag" + (ev.core ? "" : " noncore");
-    if (ev.core) {
-      tag.style.background = `var(${CARE_COLORS[ev.block.care] || "--noncore"})`;
-      tag.textContent = ev.block.care;
-    } else {
-      tag.textContent = "—";
-    }
-    const title = document.createElement("span");
-    title.textContent = ev.title;
-    li.append(time, tag, title);
-    list.appendChild(li);
+    const tag = document.createElement("span"); tag.className = "tag" + (ev.core ? "" : " noncore");
+    if (ev.core) { tag.style.background = `var(${CARE_COLORS[ev.block.care] || "--noncore"})`; tag.textContent = ev.block.care; }
+    else tag.textContent = "—";
+    const title = document.createElement("span"); title.textContent = ev.title;
+    const chev = document.createElement("span"); chev.className = "chev"; chev.textContent = "▸";
+    head.append(time, tag, title, chev);
+    const desc = document.createElement("div"); desc.className = "evt-desc"; desc.hidden = true;
+    desc.innerHTML = (ev.location ? `<span class="loc">📍 ${escapeHtml(ev.location)}</span>\n` : "") +
+      (ev.description ? escapeHtml(ev.description) : "(no description)");
+    head.addEventListener("click", () => { desc.hidden = !desc.hidden; chev.textContent = desc.hidden ? "▸" : "▾"; });
+    item.append(head, desc);
+    list.appendChild(item);
   }
-  if (!events.length) {
-    const li = document.createElement("li");
-    li.textContent = "No timed events on the calendar today.";
-    list.appendChild(li);
-  }
+  if (!events.length) { const li = document.createElement("li"); li.textContent = "No timed events on the calendar today."; list.appendChild(li); }
 }
 
 export function showSignedOut() {
@@ -413,4 +409,92 @@ export function emoteSilent() {
 }
 export function setBrainDot(state) { // "" | "ok" | "warn" | "bad"
   const d = $("brain-dot"); if (d) d.className = "dot" + (state ? " " + state : "");
+}
+
+
+// ===========================================================================
+// Phase 7 — numbers panel (edit any metric anytime) + stats drawer
+// ===========================================================================
+export function showNumbersPanel(blocks, row, onSave) {
+  const d = $("numbers-drawer");
+  d.innerHTML = '<div class="dhead"><h2>📊 Today\'s numbers</h2><button class="dclose">✕ Close</button></div><div class="wrap" id="num-wrap"></div>';
+  const wrap = d.querySelector("#num-wrap");
+  const inputs = {};
+  for (const b of blocks) {
+    const r = document.createElement("div"); r.className = "num-row";
+    r.innerHTML = `<span class="ic">${CARE_ICON[b.care] || "⭐"}</span><span class="lab">${b.metric} <small>${row["missed" + b.id] ? "· was missed" : ""}</small></span>`;
+    const inp = document.createElement("input"); inp.type = "number"; inp.min = "0";
+    inp.value = row["m" + b.id] == null ? "" : row["m" + b.id];
+    inputs["m" + b.id] = inp; r.appendChild(inp); wrap.appendChild(r);
+  }
+  const fdefs = [["m11_calls", "📞 Calls generated"], ["m12_attended", "✅ Calls attended"], ["m13_signups", "⭐ Signups"]];
+  for (const [f, l] of fdefs) {
+    const r = document.createElement("div"); r.className = "num-row";
+    r.innerHTML = `<span class="ic">·</span><span class="lab">${l}</span>`;
+    const inp = document.createElement("input"); inp.type = "number"; inp.min = "0"; inp.value = row[f] ?? 0;
+    inputs[f] = inp; r.appendChild(inp); wrap.appendChild(r);
+  }
+  const actions = document.createElement("div"); actions.className = "num-actions";
+  const save = document.createElement("button"); save.className = "btn"; save.textContent = "Save all";
+  const cancel = document.createElement("button"); cancel.className = "btn btn-ghost"; cancel.textContent = "Cancel";
+  actions.append(save, cancel); wrap.appendChild(actions);
+  const close = () => { d.hidden = true; };
+  d.querySelector(".dclose").onclick = close; cancel.onclick = close;
+  save.onclick = async () => {
+    save.textContent = "Saving…"; save.disabled = true;
+    const changes = { metrics: {}, fields: {} };
+    for (const b of blocks) { const v = inputs["m" + b.id].value; if (v !== "") changes.metrics[b.id] = parseInt(v, 10) || 0; }
+    for (const [f] of fdefs) changes.fields[f] = parseInt(inputs[f].value, 10) || 0;
+    await onSave(changes); toast("Numbers saved ✓"); close();
+  };
+  d.hidden = false;
+}
+
+function drawLine(cv, data, colorVar) {
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height, pad = 8;
+  g.clearRect(0, 0, W, H);
+  if (!data.length) return;
+  const mx = Math.max(1, ...data), mn = Math.min(0, ...data);
+  const col = getComputedStyle(document.documentElement).getPropertyValue(colorVar || "--accent").trim() || "#7bd88f";
+  const X = (i) => pad + (i / Math.max(1, data.length - 1)) * (W - 2 * pad);
+  const Y = (v) => H - pad - ((v - mn) / Math.max(1, mx - mn)) * (H - 2 * pad);
+  const avg = data.reduce((a, c) => a + c, 0) / data.length;
+  g.strokeStyle = "rgba(255,255,255,0.12)"; g.setLineDash([4, 4]);
+  g.beginPath(); g.moveTo(pad, Y(avg)); g.lineTo(W - pad, Y(avg)); g.stroke(); g.setLineDash([]);
+  g.strokeStyle = col; g.lineWidth = 2; g.beginPath();
+  data.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)))); g.stroke();
+  g.fillStyle = col; data.forEach((v, i) => g.fillRect(X(i) - 1.5, Y(v) - 1.5, 3, 3));
+}
+
+export function showStats(rows, blocks) {
+  const d = $("stats-drawer");
+  let tf = 30;
+  d.innerHTML = '<div class="dhead"><h2>📈 Stats</h2><button class="dclose">✕ Close</button></div><div class="wrap"><div class="filters" id="stat-filters"></div><div id="stat-cards"></div></div>';
+  d.querySelector(".dclose").onclick = () => { d.hidden = true; };
+  const filters = d.querySelector("#stat-filters");
+  const cards = d.querySelector("#stat-cards");
+  [["7", "Week"], ["30", "Month"], ["90", "3 months"], ["9999", "All"]].forEach(([v, l]) => {
+    const b = document.createElement("button"); b.textContent = l; if (+v === tf) b.classList.add("on");
+    b.onclick = () => { tf = +v; [...filters.children].forEach((c) => c.classList.remove("on")); b.classList.add("on"); render(); };
+    filters.appendChild(b);
+  });
+  function render() {
+    const wd = rows.filter((r) => !r.rest).slice(-tf);
+    cards.innerHTML = "";
+    if (!wd.length) { cards.innerHTML = '<p style="color:var(--ink-dim)">No data yet — come back after a few workdays.</p>'; return; }
+    for (const b of blocks) {
+      const series = wd.map((r) => r["m" + b.id] ?? 0);
+      const avg = Math.round(series.reduce((a, c) => a + c, 0) / series.length);
+      const card = document.createElement("div"); card.className = "stat-card";
+      card.innerHTML = `<div class="sh"><span class="nm">${CARE_ICON[b.care] || ""} ${b.metric}</span><span class="mm">avg ${avg} · max ${Math.max(...series)} · last ${series[series.length - 1]}</span></div>`;
+      const cv = document.createElement("canvas"); cv.width = 700; cv.height = 70; card.appendChild(cv);
+      cards.appendChild(card); drawLine(cv, series, CARE_COLORS[b.care]);
+    }
+    // funnel totals over timeframe
+    const t = wd.reduce((a, r) => ({ memos: a.memos + (r.m1 || 0) + (r.m2 || 0) + (r.m4 || 0), calls: a.calls + (r.m11_calls || 0), att: a.att + (r.m12_attended || 0), sign: a.sign + (r.m13_signups || 0) }), { memos: 0, calls: 0, att: 0, sign: 0 });
+    const fc = document.createElement("div"); fc.className = "stat-card";
+    fc.innerHTML = `<div class="sh"><span class="nm">🎯 Funnel (this range)</span></div><div style="font-size:13px">${t.memos} memos → ${t.calls} calls → ${t.att} attended → ${t.sign} signups</div>`;
+    cards.appendChild(fc);
+  }
+  render(); d.hidden = false;
 }
