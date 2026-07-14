@@ -2,7 +2,7 @@
 
 _Single source of truth for "what's done / what's next / open issues." Every session updates this._
 
-Last updated: 2026-07-13 (Phase 6 — Gemini brain; owner accept test pending)
+Last updated: 2026-07-14 (Phase 7 shakedown round 1 — all 6 items fixed)
 
 ---
 
@@ -16,8 +16,8 @@ Last updated: 2026-07-13 (Phase 6 — Gemini brain; owner accept test pending)
 - [~] **Phase 3 — Rules engine** 🟡 BUILT — owner accept test pending
 - [x] **Phase 4 — Sprites** ✅ (5 species, renderer, 10 trait systems, scene integration; owner chose Aquafin)
 - [x] **Phase 5 — Audio** ✅ (GB synth + generative themes + jingles; owner approved)
-- [~] **Phase 6 — Brain (Gemini)** 🟡 BUILT — owner accept test pending
-- [ ] **Phase 7 — Shakedown** ← final (a real week)
+- [x] **Phase 6 — Brain (Gemini)** ✅ (live dialogue confirmed with real numbers)
+- [~] **Phase 7 — Shakedown** 🟢 in progress (round 1 feedback shipped; real-week use ongoing)
 
 ---
 
@@ -167,3 +167,14 @@ New `js/brain.js`. Extended `js/ui.js` (speech bubble + silent emote + brain dot
 1. Click **🔑** (footer) → paste your Gemini API key (from Phase 0). Stored only in this browser.
 2. Open **⏳ Time Machine** → run a compressed day → watch Aquafin talk with **live, unique dialogue** at each moment (wake, block start/done, celebrations, nudges, recap), each with the talk blip.
 3. **Pull the network** (or use a bad key) → the companion emotes silently "…!" — never a canned line. Brain dot turns warn/bad.
+
+## Phase 7 — shakedown round 1 (owner used it a real day; all fixed)
+
+1. **Calendar descriptions in-app** — `calendar.js` now fetches `description`+`location`; day-panel events are click-to-expand (`ui.renderDayPanel`).
+2. **Edit any number anytime** — 📊 Numbers panel (`ui.showNumbersPanel`) lists all 10 metrics + call funnel with inputs; `engine.setMetric` (real §6.1 care, marks confirmed, prevents miss) / `engine.setField`. Fixes "only prompted for the earliest number after returning mid-day."
+3. **Stats screen** — 📈 Stats drawer (`ui.showStats`): per-metric line charts, timeframe filter (week/month/3mo/all), avg/max/last + funnel totals. Canvas charts, no deps.
+4. **Brain "…!" fixed** — the key persists in localStorage (no re-entry needed); the bug was model id: `gemini-2.5-flash-lite` 404s and 2.5 "thinking" models ate the token budget. `brain.verifyAndPickModel` now TEST-CALLS generateContent and picks a model that actually returns text (prefers fast non-thinking flash). Auto-heals silently on load. Confirmed live: on-tone lines using real numbers.
+5. **Calendar auto-reconnect** — on sign-in, silent GIS token (`requestToken{interactive:false}`) reconnects the calendar with no click while the Google session is active.
+6. **Idle variety + give animation** — `main.companionLoop` now cycles idle behaviours (hop/look/wander/idle) so it never looks static; each care tap flies the care emoji to Aquafin with an arc + sparkle burst + a chomp reaction (dopamine per click).
+
+Verified in-browser: Numbers panel (13 inputs), Stats (10 charts), brain dot green, live dialogue works, zero console errors.
