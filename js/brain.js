@@ -97,15 +97,30 @@ export async function listModels() {
     .map((m) => m.name.replace(/^models\//, ""));
 }
 
-// Verify the key works and pick a valid model. Returns {ok, model, count} or {ok:false, error}.
+// A model can be *listed* yet still 404 on generateContent for a given key/
+// region. So we TEST an actual tiny generation and pick the first that works.
+async function testModel(model) {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(getKey())}`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hi" }] }], generationConfig: { maxOutputTokens: 5 } }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+// Verify the key + pick a model that ACTUALLY responds to generateContent.
 export async function verifyAndPickModel() {
   if (!hasKey()) return { ok: false, error: "no key set" };
   let models;
   try { models = await listModels(); }
   catch (e) { return { ok: false, error: String(e.message || e) }; }
   if (!models.length) return { ok: false, error: "this key has no models that support generateContent" };
-  const pick = MODEL_PREFS.find((p) => models.includes(p))
-    || models.find((m) => /flash/.test(m)) || models[0];
-  setModel(pick);
-  return { ok: true, model: pick, count: models.length };
+  const pref = MODEL_PREFS.filter((p) => models.includes(p));
+  const flashes = models.filter((m) => /flash/.test(m) && !pref.includes(m));
+  const rest = models.filter((m) => !pref.includes(m) && !flashes.includes(m));
+  for (const c of [...pref, ...flashes, ...rest]) {
+    if (await testModel(c)) { setModel(c); return { ok: true, model: c, count: models.length }; }
+  }
+  return { ok: false, error: `none of ${models.length} models answered generateContent — check the Generative Language API is enabled for this key` };
 }
