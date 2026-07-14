@@ -2,7 +2,7 @@
 
 _Single source of truth for "what's done / what's next / open issues." Every session updates this._
 
-Last updated: 2026-07-14 (Phase 7 shakedown round 1 — all 6 items fixed)
+Last updated: 2026-07-14 (Phase 7b — endless world + UI overhaul)
 
 ---
 
@@ -178,3 +178,13 @@ New `js/brain.js`. Extended `js/ui.js` (speech bubble + silent emote + brain dot
 6. **Idle variety + give animation** — `main.companionLoop` now cycles idle behaviours (hop/look/wander/idle) so it never looks static; each care tap flies the care emoji to Aquafin with an arc + sparkle burst + a chomp reaction (dopamine per click).
 
 Verified in-browser: Numbers panel (13 inputs), Stats (10 charts), brain dot green, live dialogue works, zero console errors.
+
+## Phase 7b — endless world + UI overhaul (owner request)
+
+- **Removed the bottom schedule list** (`#event-list`, `#lineup`) — that data lives in the top timeline strip.
+- **Timeline bars are clickable** → open the event's calendar description + location in-app (`ui.showEventDetail`, `#timeline-detail`).
+- **Endless parallax world** replaces the small room canvas: full-bleed `#world-wrap` canvas with a day sky / night sky (stars + moon when the companion sleeps), 2 parallax hill layers, drifting clouds, procedurally-placed trees/bushes/flowers/rocks, and grass — all scrolling endlessly (`main.drawWorld`, seeded, `mod`-wrapped tiles). Aquafin strolls/idles in the foreground; state banner + controls + speech bubble are overlays.
+- **Bug fixes found during this change:**
+  - Full-bleed layout was capped by a leftover Phase-4 `#room-canvas { max-width: 380px }` — overridden.
+  - **Reload-after-close was re-advancing neglect** (a fresh engine re-ran `runClose` each load), which could kill the companion on reload. Added a **once-per-day close guard** (`companion.lastCloseDate`). Combined with the existing pristine-reset, a companion lost to this bug is auto-restored to the Aquafin starter on next load.
+- **Mount-cache gotcha (again):** git staged a STALE `index.html` even though the mount showed the new one; caught by diffing `git show HEAD:index.html`. Always verify staged blobs (`git show :file`) for critical files before committing.
